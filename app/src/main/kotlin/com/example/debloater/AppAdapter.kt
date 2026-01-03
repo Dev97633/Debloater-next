@@ -1,5 +1,6 @@
 package com.example.debloater
 
+import android.content.pm.PackageInfo
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -7,7 +8,7 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 
 class AppAdapter(
     private val apps: List<PackageInfo>,
@@ -30,9 +31,10 @@ class AppAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val app = apps[position]
         val pm = holder.itemView.context.packageManager
+        val appInfo = app.applicationInfo ?: return  // Skip if null (rare cases)
 
-        holder.icon.setImageDrawable(app.applicationInfo.loadIcon(pm))
-        holder.name.text = app.applicationInfo.loadLabel(pm)
+        holder.icon.setImageDrawable(appInfo.loadIcon(pm))
+        holder.name.text = appInfo.loadLabel(pm)
         holder.pkg.text = app.packageName
 
         holder.uninstallButton.setOnClickListener {
