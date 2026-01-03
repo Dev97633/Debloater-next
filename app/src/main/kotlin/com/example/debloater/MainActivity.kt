@@ -1,9 +1,10 @@
 package com.example.debloater
 
-import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
@@ -18,7 +19,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var refreshButton: Button
 
     private val pm: PackageManager by lazy { packageManager }
-
     private var allApps: List<PackageInfo> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,22 +35,18 @@ class MainActivity : AppCompatActivity() {
 
         loadApps()
 
-        adapter = AppAdapter(
-            apps = allApps,
-            packageManager = pm,
-            onActionClick = { packageName, action ->
-                when (action) {
-                    "uninstall" -> {
-                        ShizukuManager.uninstall(packageName)
-                        refreshList()
-                    }
-                    "disable" -> {
-                        ShizukuManager.disable(packageName)
-                        refreshList()
-                    }
+        adapter = AppAdapter(allApps, pm) { packageName, action ->
+            when (action) {
+                "uninstall" -> {
+                    ShizukuManager.uninstall(packageName)
+                    refreshList()
+                }
+                "disable" -> {
+                    ShizukuManager.disable(packageName)
+                    refreshList()
                 }
             }
-        )
+        }
         recyclerView.adapter = adapter
 
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
@@ -69,12 +65,10 @@ class MainActivity : AppCompatActivity() {
     private fun loadApps() {
         allApps = pm.getInstalledPackages(0)
             .filter { it.applicationInfo != null }
-            .sortedBy {
-                pm.getApplicationLabel(it.applicationInfo!!).toString().lowercase()
-            }
+            .sortedBy { pm.getApplicationLabel(it.applicationInfo!!).toString().lowercase() }
 
         adapter.updateApps(allApps)
-        filterApps(searchView.query?.toString().orEmpty()) // Keep current search
+        filterApps(searchView.query.toString()) // Preserve current search
     }
 
     private fun filterApps(query: String) {
@@ -92,7 +86,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshList() {
-        recyclerView.postDelayed({ loadApps() }, 800)
+        Handler(Looper.getMainLooper()).postDelayed({
+            loadApps()
+        }, 1000) // 1 second delay for system to update
     }
 
     override fun onDestroy() {
