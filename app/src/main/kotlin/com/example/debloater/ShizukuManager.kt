@@ -35,7 +35,18 @@ object ShizukuManager {
         override fun onServiceDisconnected(name: ComponentName?) {
             debloaterService = null
             isBound = false
+            Toast.makeText(context, "Shizuku service disconnected", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private val userServiceArgs = lazy {
+        Shizuku.UserServiceArgs(
+            ComponentName(context.packageName, DebloaterService::class.java.name)
+        )
+            .daemon(false)
+            .debuggable(false)
+            .version(1)
+            .tag("debloater")
     }
 
     fun init(context: Context) {
@@ -46,18 +57,11 @@ object ShizukuManager {
     fun cleanup() {
         Shizuku.removeRequestPermissionResultListener(requestPermissionResultListener)
         if (isBound) {
-            Shizuku.unbindUserService(serviceArgs(), serviceConnection, true)
+            // The third parameter (true) calls destroy() on the service
+            Shizuku.unbindUserService(userServiceArgs.value, serviceConnection, true)
             isBound = false
         }
     }
-
-    private fun serviceArgs() = Shizuku.UserServiceArgs(
-        ComponentName(context.packageName, DebloaterService::class.java.name)
-    )
-        .daemon(false)
-        .debuggable(false)
-        .version(1)
-        .tag("debloater")
 
     fun checkAndRequestPermission(): Boolean {
         if (!Shizuku.pingBinder()) {
@@ -76,7 +80,10 @@ object ShizukuManager {
     fun bindService() {
         if (!checkAndRequestPermission()) return
 
-        Shizuku.bindUserService(serviceArgs(), serviceConnection)
+        // Initialize args now that context is available
+        userServiceArgs.value
+
+        Shizuku.bindUserService(userServiceArgs.value, serviceConnection)
     }
 
     fun uninstall(packageName: String) {
