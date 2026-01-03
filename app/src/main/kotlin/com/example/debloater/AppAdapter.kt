@@ -14,7 +14,7 @@ import androidx.recyclerview.widget.RecyclerView
 
 class AppAdapter(
     private var apps: List<PackageInfo>,
-    private val packageManager: PackageManager,
+    private val pm: PackageManager,
     private val onActionClick: (String, String) -> Unit
 ) : RecyclerView.Adapter<AppAdapter.ViewHolder>() {
 
@@ -27,78 +27,38 @@ class AppAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val layout = when (viewType) {
-            0 -> R.layout.item_section_header
-            else -> R.layout.item_app
-        }
-        val view = LayoutInflater.from(parent.context).inflate(layout, parent, false)
+        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_app, parent, false)
         return ViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        when (getItemViewType(position)) {
-            0 -> { // Section header
-                val title = if (position == 0) "Enabled Apps" else "Disabled Apps"
-                holder.itemView.findViewById<TextView>(R.id.section_title)?.text = title
-            }
-            else -> {
-                val adjustedPos = position - headerCountBefore(position)
-                val app = apps[adjustedPos]
-                val appInfo = app.applicationInfo!!
+        val app = apps[position]
+        val appInfo = app.applicationInfo!!
 
-                holder.icon.setImageDrawable(appInfo.loadIcon(packageManager))
-                holder.name.text = appInfo.loadLabel(packageManager)
-                holder.pkg.text = app.packageName
+        holder.icon.setImageDrawable(appInfo.loadIcon(pm))
+        holder.name.text = appInfo.loadLabel(pm)
+        holder.pkg.text = app.packageName
 
-                // System app → orange text
-                val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
-                               (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-                holder.name.setTextColor(if (isSystem) Color.parseColor("#FF9800") else Color.BLACK)
+        // System app = orange text
+        val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                       (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+        holder.name.setTextColor(if (isSystem) Color.parseColor("#FF9800") else Color.BLACK)
 
-                // Disabled app → dimmed
-                holder.itemView.alpha = if (appInfo.enabled) 1.0f else 0.5f
+        // Disabled app = dimmed
+        holder.itemView.alpha = if (appInfo.enabled) 1.0f else 0.5f
 
-                holder.uninstallButton.setOnClickListener {
-                    onActionClick(app.packageName, "uninstall")
-                }
-                holder.disableButton.setOnClickListener {
-                    onActionClick(app.packageName, "disable")
-                }
-            }
+        holder.uninstallButton.setOnClickListener {
+            onActionClick(app.packageName, "uninstall")
+        }
+        holder.disableButton.setOnClickListener {
+            onActionClick(app.packageName, "disable")
         }
     }
 
-    override fun getItemCount(): Int {
-        val enabled = apps.count { it.applicationInfo!!.enabled }
-        val disabled = apps.size - enabled
-        var total = apps.size
-        if (enabled > 0) total++
-        if (disabled > 0) total++
-        return total
-    }
-
-    override fun getItemViewType(position: Int): Int {
-        val enabledCount = apps.count { it.applicationInfo!!.enabled }
-        return when {
-            enabledCount > 0 && position == 0 -> 0 // Enabled header
-            position < enabledCount + (if (enabledCount > 0) 1 else 0) -> 1 // Enabled app
-            disabledCount() > 0 && position == enabledCount + (if (enabledCount > 0) 1 else 0) -> 0 // Disabled header
-            else -> 1 // Disabled app
-        }
-    }
-
-    private fun disabledCount() = apps.count { !it.applicationInfo!!.enabled }
-
-    private fun headerCountBefore(position: Int): Int {
-        var count = 0
-        val enabledCount = apps.count { it.applicationInfo!!.enabled }
-        if (enabledCount > 0) count++
-        if (position > enabledCount + count && disabledCount() > 0) count++
-        return count
-    }
+    override fun getItemCount() = apps.size
 
     fun updateApps(newApps: List<PackageInfo>) {
-        this.apps = newApps
+        apps = newApps
         notifyDataSetChanged()
     }
 }
