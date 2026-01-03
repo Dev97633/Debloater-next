@@ -19,7 +19,8 @@ object ShizukuManager {
         if (requestCode == REQUEST_CODE) {
             if (grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(context, "Shizuku permission granted", Toast.LENGTH_SHORT).show()
-                bindService()  // Bind immediately after permission is granted
+                // Bind immediately after permission grant
+                attemptBind()
             } else {
                 Toast.makeText(context, "Shizuku permission denied", Toast.LENGTH_SHORT).show()
             }
@@ -27,21 +28,21 @@ object ShizukuManager {
     }
 
     private val binderReceivedListener = Shizuku.OnBinderReceivedListener {
-        // Bind service when Shizuku binder becomes available (e.g., after Shizuku starts or restarts)
-        bindService()
+        Toast.makeText(context, "Shizuku binder received", Toast.LENGTH_SHORT).show()
+        attemptBind()
     }
 
     private val binderDeadListener = Shizuku.OnBinderDeadListener {
         isBound = false
         debloaterService = null
-        Toast.makeText(context, "Shizuku binder died. Please restart Shizuku.", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "Shizuku binder died - restart Shizuku", Toast.LENGTH_LONG).show()
     }
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             debloaterService = IDebloaterService.Stub.asInterface(service)
             isBound = true
-            Toast.makeText(context, "Shizuku service connected", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Shizuku service connected successfully!", Toast.LENGTH_LONG).show()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -51,73 +52,68 @@ object ShizukuManager {
         }
     }
 
-    private fun serviceArgs() = Shizuku.UserServiceArgs(
-        ComponentName(context.packageName, DebloaterService::class.java.name)
-    )
-        .daemon(false)
-        .debuggable(false)
-        .version(1)
-        .tag("debloater")
+    private val userServiceArgs = lazy {
+        Shizuku.UserServiceArgs(
+            ComponentName(context.packageName, DebloaterService::class.java.name)
+        )
+            .daemon(false)
+            .debuggable(false)  // Change to true only for debugging
+            .version(1)
+            .tag("debloater")  // Important: unique tag for identification
+    }
 
     fun init(context: Context) {
         this.context = context.applicationContext
+
         Shizuku.addRequestPermissionResultListener(requestPermissionResultListener)
         Shizuku.addBinderReceivedListener(binderReceivedListener)
         Shizuku.addBinderDeadListener(binderDeadListener)
-        // Attempt initial bind if possible
-        bindService()
+
+        // Initial attempt
+        attemptBind()
     }
 
     fun cleanup() {
         Shizuku.removeRequestPermissionResultListener(requestPermissionResultListener)
         Shizuku.removeBinderReceivedListener(binderReceivedListener)
         Shizuku.removeBinderDeadListener(binderDeadListener)
+
         if (isBound) {
-            Shizuku.unbindUserService(serviceArgs(), serviceConnection, true)  // true to call destroy() on service
+            Shizuku.unbindUserService(userServiceArgs.value, serviceConnection, true)
             isBound = false
         }
     }
 
-    fun checkAndRequestPermission(): Boolean {
+    private fun attemptBind() {
+        if (isBound) return
+
         if (!Shizuku.pingBinder()) {
-            Toast.makeText(context, "Shizuku is not running. Start it first.", Toast.LENGTH_LONG).show()
-            return false
+            Toast.makeText(context, "Shizuku is not running", Toast.LENGTH_LONG).show()
+            return
         }
 
-        if (Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            return true
-        }
-
-        if (Shizuku.shouldShowRequestPermissionRationale()) {
-            Toast.makeText(context, "Permission denied permanently. Grant in Shizuku app.", Toast.LENGTH_LONG).show()
-            return false
-        } else {
+        if (Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             Shizuku.requestPermission(REQUEST_CODE)
-            return false
+            return
         }
-    }
-
-    fun bindService() {
-        if (isBound) return  // Already bound
-
-        if (!checkAndRequestPermission()) return
 
         try {
-            Shizuku.bindUserService(serviceArgs(), serviceConnection)
+            Shizuku.bindUserService(userServiceArgs.value, serviceConnection)
         } catch (e: Exception) {
-            Toast.makeText(context, "Failed to bind Shizuku service: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Bind failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
     fun uninstall(packageName: String) {
         if (!isBound || debloaterService == null) {
-            Toast.makeText(context, "Shizuku not connected", Toast.LENGTH_SHORT).show()
-            bindService()  // Attempt re-bind if not connected
+            Toast.makeText(context, "Shizuku not connected - retrying...", Toast.LENGTH_SHORT).show()
+            attemptBind()  // Try to reconnect automatically
             return
         }
+
         try {
             debloaterService?.uninstall(packageName)
-            Toast.makeText(context, "Uninstall sent for $packageName", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Uninstall command sent: $packageName", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Toast.makeText(context, "Uninstall failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
@@ -125,13 +121,14 @@ object ShizukuManager {
 
     fun disable(packageName: String) {
         if (!isBound || debloaterService == null) {
-            Toast.makeText(context, "Shizuku not connected", Toast.LENGTH_SHORT).show()
-            bindService()  // Attempt re-bind if not connected
+            Toast.makeText(context, "Shizuku not connected - retrying...", Toast.LENGTH_SHORT).show()
+            attemptBind()
             return
         }
+
         try {
             debloaterService?.disable(packageName)
-            Toast.makeText(context, "Disabled $packageName", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Disable command sent: $packageName", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Toast.makeText(context, "Disable failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
