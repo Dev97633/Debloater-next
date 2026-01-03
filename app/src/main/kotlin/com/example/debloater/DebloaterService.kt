@@ -1,50 +1,37 @@
 package com.example.debloater
 
-import android.content.Context
-import android.content.pm.IPackageManager
-import android.os.RemoteException
+import android.os.Process
 import com.example.debloater.IDebloaterService
-import rikka.shizuku.SystemServiceHelper
+import java.io.DataOutputStream
 
 class DebloaterService : IDebloaterService.Stub() {
 
-    // Support both new (v13+) and old Shizuku versions
+    // Only the empty constructor is required for UserService
     constructor() : super()
 
-    constructor(context: Context) : super() {
-        // Context is provided by Shizuku v13+, but we don't need it here
-    }
-
-    private val packageManager: IPackageManager by lazy {
-        IPackageManager.Stub.asInterface(SystemServiceHelper.getSystemService("package"))
-    }
-
     override fun uninstall(packageName: String) {
-        try {
-            // pm uninstall --user 0 <package>
-            packageManager.deletePackageAsUser(packageName, 0, 0)
-            // Alternative if above fails on some ROMs: packageManager.getPackageInstaller().uninstall(packageName, null)
-        } catch (e: RemoteException) {
-            throw RuntimeException(e)
-        }
+        executeAsShell("pm uninstall --user 0 $packageName")
     }
 
     override fun disable(packageName: String) {
+        executeAsShell("pm disable-user --user 0 $packageName")
+    }
+
+    private fun executeAsShell(command: String) {
         try {
-            // pm disable-user --user 0 <package>
-            packageManager.setApplicationEnabledSetting(
-                packageName,
-                android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER,
-                0,
-                0,  // user 0
-                null
-            )
-        } catch (e: RemoteException) {
+            val p = Runtime.getRuntime().exec("sh")
+            val os = DataOutputStream(p.outputStream)
+            os.writeBytes(command + "\n")
+            os.writeBytes("exit\n")
+            os.flush()
+            os.close()
+            p.waitFor()
+        } catch (e: Exception) {
             throw RuntimeException(e)
         }
     }
 
     override fun destroy() {
-        System.exit(0)
+        Process.killProcess(Process.myPid())
     }
 }
