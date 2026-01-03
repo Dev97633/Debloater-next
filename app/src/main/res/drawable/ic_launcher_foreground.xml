@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Trash bin body -->
+    <path android:fillColor="#000000"
+        android:pathData="M30,30h48v60H30z"/>
+    <!-- Trash bin lid -->
+    <path android:fillColor="#000000"
+        android:pathData="M24,30h60v12H24z"/>
+    <!-- Trash lines -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M42,45v30M54,45v30M66,45v30"/>
+</vector>
