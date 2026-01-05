@@ -1,7 +1,7 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme for Compose apps -->
-    <style name="Theme.Debloater" parent="android:Theme.Material.Light.NoActionBar">
-        <!-- Optional: customize status bar if needed -->
-        <!-- <item name="android:statusBarColor">@android:color/transparent</item> -->
+<resources>
+    <!-- Minimal theme for Compose apps -->
+    <style name="Theme.Debloater" parent="android:Theme.Material.NoActionBar">
+        <!-- Optional: Make status bar icons dark -->
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>
