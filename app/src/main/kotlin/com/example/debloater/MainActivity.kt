@@ -16,7 +16,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // This automatically handles Shizuku connection
         ShizukuManager.init(this)
 
         recyclerView = findViewById(R.id.recycler_view)
@@ -24,7 +23,8 @@ class MainActivity : AppCompatActivity() {
 
         val apps = getInstalledApps()
 
-        adapter = AppAdapter(apps) { packageName, action ->
+        // Pass packageManager to the adapter
+        adapter = AppAdapter(apps, packageManager) { packageName, action ->
             when (action) {
                 "uninstall" -> ShizukuManager.uninstall(packageName)
                 "disable" -> ShizukuManager.disable(packageName)
@@ -42,9 +42,13 @@ class MainActivity : AppCompatActivity() {
         val pm = packageManager
         return pm.getInstalledPackages(PackageManager.MATCH_ALL)
             .filter { it.applicationInfo != null }
-            .sortedBy {
-                pm.getApplicationLabel(it.applicationInfo!!).toString()
-                    .lowercase()
+            .sortedBy { 
+                pm.getApplicationLabel(it.applicationInfo!!).toString().lowercase()
             }
     }
+
+    // Optional: Add a refresh function later
+    // fun refreshAppList() {
+    //     adapter.updateApps(getInstalledApps())
+    // }
 }
