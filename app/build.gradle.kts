@@ -40,9 +40,9 @@ kotlin {
     }
 }
 
-composeCompiler {
-    includeSourceInformation.set(false)  // Fixes the "multiple values" error
-}
+// Remove the composeCompiler block entirely
+// The "multiple values" error happens because the plugin and BOM set defaults,
+// and adding includeSourceInformation causes a duplicate.
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
