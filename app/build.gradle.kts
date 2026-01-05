@@ -1,7 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose") version "2.3.0"
+   
 }
 
 android {
@@ -40,16 +40,16 @@ kotlin {
     }
 }
 
-// Remove the composeCompiler block entirely
-// The "multiple values" error happens because the plugin and BOM set defaults,
-// and adding includeSourceInformation causes a duplicate.
+// IMPORTANT: Do NOT add any composeCompiler {} block here
+// The plugin and Compose BOM already set default compiler options (including sourceInformation = true)
+// Adding any composeCompiler configuration causes duplicate arguments → the error you saw
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
 
-    // Compose BOM
+    // Compose BOM (manages all Compose versions automatically)
     implementation(platform("androidx.compose:compose-bom:2024.01.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
