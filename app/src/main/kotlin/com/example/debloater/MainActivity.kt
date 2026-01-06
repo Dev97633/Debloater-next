@@ -78,55 +78,20 @@ fun DebloaterTheme(
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
     val pm = context.packageManager
-    val allApps = remember { getInstalledApps(pm) }
-    var apps by remember { mutableStateOf(allApps) }
+    val apps by remember { mutableStateOf(getInstalledApps(pm)) }
 
-    var query by remember { mutableStateOf("") }
-    var active by remember { mutableStateOf(false) }
-
-    // Filter apps based on search query
-    LaunchedEffect(query) {
-        if (query.isEmpty()) {
-            apps = allApps
-        } else {
-            apps = allApps.filter {
-                it.applicationInfo?.loadLabel(pm)?.toString()?.contains(query, ignoreCase = true) == true ||
-                it.packageName.contains(query, ignoreCase = true)
-            }
-        }
-    }
+    var showConfirmUninstall by remember { mutableStateOf(false) }
+    var selectedPackage by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
-            DockedSearchBar(
-                query = query,
-                onQueryChange = { query = it },
-                onSearch = { active = false },
-                active = active,
-                onActiveChange = { active = it },
-                placeholder = { Text("Search apps...") },
-                leadingIcon = {
-                    if (active) {
-                        IconButton(onClick = {
-                            query = ""
-                            active = false
-                        }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                        }
-                    } else {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
-                    }
-                },
-                trailingIcon = {
-                    if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear")
-                        }
-                    }
-                }
-            ) {
-                // Optional: recent searches or suggestions here
-            }
+            TopAppBar(
+                title = { Text("Debloater") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
@@ -143,34 +108,34 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     pm = pm,
                     onDisable = { ShizukuManager.disable(it) },
                     onUninstall = { pkg ->
-                        // You can add confirmation here if not already in AppCard
-                        ShizukuManager.uninstall(pkg)
+                        selectedPackage = pkg
+                        showConfirmUninstall = true
                     }
                 )
             }
         }
-    }
-}
 
-    if (showConfirmUninstall) {
-        AlertDialog(
-            onDismissRequest = { showConfirmUninstall = false },
-            title = { Text("Confirm Uninstall") },
-            text = { Text("Are you sure you want to uninstall $selectedPackage?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    ShizukuManager.uninstall(selectedPackage!!)
-                    showConfirmUninstall = false
-                }) {
-                    Text("Uninstall")
+        // AlertDialog MUST be inside the Scaffold or DebloaterScreen, not outside
+        if (showConfirmUninstall) {
+            AlertDialog(
+                onDismissRequest = { showConfirmUninstall = false },
+                title = { Text("Confirm Uninstall") },
+                text = { Text("Are you sure you want to uninstall $selectedPackage?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        ShizukuManager.uninstall(selectedPackage!!)
+                        showConfirmUninstall = false
+                    }) {
+                        Text("Uninstall")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showConfirmUninstall = false }) {
+                        Text("Cancel")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showConfirmUninstall = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
+            )
+        }
     }
 }
 
