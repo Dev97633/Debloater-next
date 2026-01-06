@@ -1,4 +1,5 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalAnimationApi::class)
 
 package com.example.debloater
 
@@ -135,7 +136,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     }
 }
 
-@OptIn(ExperimentalAnimationApi::class)
+
 @Composable
 fun AppCard(
     app: PackageInfo,
