@@ -1,5 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-@file:OptIn(ExperimentalAnimationApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class)  // Only this one is needed
 
 package com.example.debloater
 
@@ -14,9 +13,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.animation.animateItemPlacement
-import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.foundation.layout.animateItemPlacement
+import androidx.compose.animation.animateItemPlacement  // ← Correct import (only this one)
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
-
 
 class MainActivity : ComponentActivity() {
 
@@ -101,16 +97,16 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(apps, key = { it.packageName }) { app ->
-    AppCard(
-        app = app,
-        pm = pm,
-        onDisable = { ShizukuManager.disable(it) },
-        onUninstall = { pkg ->
-            selectedPackage = pkg
-            showConfirmUninstall = true
-        }
-    )
-}
+                AppCard(
+                    app = app,
+                    pm = pm,
+                    onDisable = { ShizukuManager.disable(it) },
+                    onUninstall = { pkg ->
+                        selectedPackage = pkg
+                        showConfirmUninstall = true
+                    }
+                )
+            }
         }
     }
 
@@ -136,7 +132,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     }
 }
 
-
 @Composable
 fun AppCard(
     app: PackageInfo,
@@ -152,7 +147,7 @@ fun AppCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateItemPlacement()  // Smooth entry/exit animation when list changes
+            .animateItemPlacement()  // Smooth animation — stable API, no opt-in needed
     ) {
         Row(
             modifier = Modifier
@@ -160,7 +155,6 @@ fun AppCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Async icon loading with key to avoid reloading on every recomposition
             val iconPainter = rememberAsyncImagePainter(
                 model = remember(app.packageName) {
                     try {
@@ -180,7 +174,6 @@ fun AppCard(
             )
 
             Column(modifier = Modifier.weight(1f)) {
-                // Cache label to avoid repeated PM calls
                 val appName = remember(app.packageName) {
                     try {
                         appInfo.loadLabel(pm).toString()
