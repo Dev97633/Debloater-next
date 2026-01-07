@@ -84,6 +84,9 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var query by remember { mutableStateOf("") }
     var active by remember { mutableStateOf(false) }
 
+    var showConfirmUninstall by remember { mutableStateOf(false) }
+    var selectedPackage by remember { mutableStateOf<String?>(null) }
+
     // Filter apps based on search query
     LaunchedEffect(query) {
         if (query.isEmpty()) {
@@ -124,9 +127,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                         }
                     }
                 }
-            ) {
-                // Optional: recent searches or suggestions here
-            }
+            ) { }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
@@ -143,16 +144,14 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     pm = pm,
                     onDisable = { ShizukuManager.disable(it) },
                     onUninstall = { pkg ->
-                        // You can add confirmation here if not already in AppCard
-                        ShizukuManager.uninstall(pkg)
+                        selectedPackage = pkg
+                        showConfirmUninstall = true  // Opens confirmation dialog
                     }
                 )
             }
         }
-    }
-}
 
-        // AlertDialog MUST be inside the Scaffold or DebloaterScreen, not outside
+        // Confirmation dialog — now correctly inside the composable
         if (showConfirmUninstall) {
             AlertDialog(
                 onDismissRequest = { showConfirmUninstall = false },
