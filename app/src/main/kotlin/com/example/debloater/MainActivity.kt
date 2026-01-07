@@ -78,20 +78,55 @@ fun DebloaterTheme(
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
     val pm = context.packageManager
-    val apps by remember { mutableStateOf(getInstalledApps(pm)) }
+    val allApps = remember { getInstalledApps(pm) }
+    var apps by remember { mutableStateOf(allApps) }
 
-    var showConfirmUninstall by remember { mutableStateOf(false) }
-    var selectedPackage by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
+    var active by remember { mutableStateOf(false) }
+
+    // Filter apps based on search query
+    LaunchedEffect(query) {
+        if (query.isEmpty()) {
+            apps = allApps
+        } else {
+            apps = allApps.filter {
+                it.applicationInfo?.loadLabel(pm)?.toString()?.contains(query, ignoreCase = true) == true ||
+                it.packageName.contains(query, ignoreCase = true)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Debloater") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
+            DockedSearchBar(
+                query = query,
+                onQueryChange = { query = it },
+                onSearch = { active = false },
+                active = active,
+                onActiveChange = { active = it },
+                placeholder = { Text("Search apps...") },
+                leadingIcon = {
+                    if (active) {
+                        IconButton(onClick = {
+                            query = ""
+                            active = false
+                        }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = "Search")
+                    }
+                },
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { query = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                        }
+                    }
+                }
+            ) {
+                // Optional: recent searches or suggestions here
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
@@ -108,12 +143,14 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     pm = pm,
                     onDisable = { ShizukuManager.disable(it) },
                     onUninstall = { pkg ->
-                        selectedPackage = pkg
-                        showConfirmUninstall = true
+                        // You can add confirmation here if not already in AppCard
+                        ShizukuManager.uninstall(pkg)
                     }
                 )
             }
         }
+    }
+}
 
         // AlertDialog MUST be inside the Scaffold or DebloaterScreen, not outside
         if (showConfirmUninstall) {
