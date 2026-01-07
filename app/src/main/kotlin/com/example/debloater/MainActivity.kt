@@ -94,7 +94,7 @@ data class AppMetadata(
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
     val pm = context.packageManager
-
+    val scope = rememberCoroutineScope()
     var allApps by remember { mutableStateOf<List<AppMetadata>>(emptyList()) }
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
