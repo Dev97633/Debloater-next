@@ -135,35 +135,36 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
 
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = {
-                isRefreshing = true
-                LaunchedEffect(Unit) {
-                    allApps = loadApps(pm)
-                    isRefreshing = false
-                }
-            }
-        ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(
-                    items = filteredApps,
-                    key = { it.packageName }
-                ) { app ->
-                    AppCard(
-                        app = app,
-                        onDisable = { ShizukuManager.disable(it) },
-                        onUninstall = { confirmUninstall = it }
-                    )
-                }
-            }
+       PullToRefreshBox(
+    isRefreshing = isRefreshing,
+    onRefresh = {
+        scope.launch {
+            isRefreshing = true
+            allApps = loadApps(pm)
+            isRefreshing = false
         }
+    }
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding),
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(
+            items = filteredApps,
+            key = { it.packageName }
+        ) { app ->
+            AppCard(
+                app = app,
+                onDisable = { ShizukuManager.disable(it) },
+                onUninstall = { confirmUninstall = it }
+            )
+        }
+    }
+}
+
 
         confirmUninstall?.let { pkg ->
             AlertDialog(
