@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.pullrefresh.PullRefreshIndicator
+import androidx.compose.material3.pullrefresh.pullRefresh
+import androidx.compose.material3.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -99,113 +102,132 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         }
     }
 
-   Scaffold(
-    topBar = {
-        Column {
-            TopAppBar(
-                title = { Text("Debloater") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-            SearchBar(
-                query = query,
-                onQueryChange = { query = it },
-                onSearch = { active = false },
-                active = active,
-                onActiveChange = { active = it },
-                placeholder = { Text("Search apps...") },
-                leadingIcon = {
-                    if (active) {
-                        IconButton(onClick = {
-                            query = ""
-                            active = false
-                        }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                        }
-                    } else {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
-                    }
-                },
-                trailingIcon = {
-                    if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear")
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                // Optional: show recent searches or filtered suggestions here
-                LazyColumn {
-                    items(apps.take(10)) { app ->  // Show first 10 results as suggestions
-                        ListItem(
-                            headlineContent = { Text(app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName) },
-                            supportingContent = { Text(app.packageName) },
-                            leadingContent = {
-                                Image(
-                                    painter = rememberAsyncImagePainter(
-                                        remember(app.packageName) { app.applicationInfo?.loadIcon(pm) }
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(40.dp)
-                                )
-                            },
-                            modifier = Modifier.clickable {
-                                query = app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName
-                                active = false
-                            }
-                        )
-                    }
-                }
-            }
+    // Pull-to-refresh state
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = false,
+        onRefresh = {
+            // Reload full app list on pull
+            apps = getInstalledApps(pm)
+            // Your LaunchedEffect(query) will automatically re-apply search filter
         }
-    },
-    snackbarHost = { SnackbarHost(snackbarHostState) }
-) { paddingValues ->
-    LazyColumn(
-        modifier = Modifier.padding(paddingValues),
-        contentPadding = PaddingValues(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(apps, key = { it.packageName }) { app ->
-            AppCard(
-                app = app,
-                pm = pm,
-                onDisable = { ShizukuManager.disable(it) },
-                onUninstall = { pkg ->
-                    selectedPackage = pkg
-                    showConfirmUninstall = true
-                }
-            )
-        }
-    }
+    )
 
-    // Confirmation dialog
-    if (showConfirmUninstall) {
-        AlertDialog(
-            onDismissRequest = { showConfirmUninstall = false },
-            title = { Text("Confirm Uninstall") },
-            text = { Text("Are you sure you want to uninstall $selectedPackage?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    ShizukuManager.uninstall(selectedPackage!!)
-                    showConfirmUninstall = false
-                }) {
-                    Text("Uninstall")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showConfirmUninstall = false }) {
-                    Text("Cancel")
+    Scaffold(
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = { Text("Debloater") },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                SearchBar(
+                    query = query,
+                    onQueryChange = { query = it },
+                    onSearch = { active = false },
+                    active = active,
+                    onActiveChange = { active = it },
+                    placeholder = { Text("Search apps...") },
+                    leadingIcon = {
+                        if (active) {
+                            IconButton(onClick = {
+                                query = ""
+                                active = false
+                            }) {
+                                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                            }
+                        } else {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
+                    },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { query = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear")
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    LazyColumn {
+                        items(apps.take(10)) { app ->
+                            ListItem(
+                                headlineContent = { Text(app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName) },
+                                supportingContent = { Text(app.packageName) },
+                                leadingContent = {
+                                    Image(
+                                        painter = rememberAsyncImagePainter(
+                                            remember(app.packageName) { app.applicationInfo?.loadIcon(pm) }
+                                        ),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                },
+                                modifier = Modifier.clickable {
+                                    query = app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName
+                                    active = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
-        )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
+        Box(modifier = Modifier.pullRefresh(pullRefreshState)) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(apps, key = { it.packageName }) { app ->
+                    AppCard(
+                        app = app,
+                        pm = pm,
+                        onDisable = { ShizukuManager.disable(it) },
+                        onUninstall = { pkg ->
+                            selectedPackage = pkg
+                            showConfirmUninstall = true
+                        }
+                    )
+                }
+            }
+
+            PullRefreshIndicator(
+                refreshing = false,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
+
+        // Confirmation dialog (unchanged)
+        if (showConfirmUninstall) {
+            AlertDialog(
+                onDismissRequest = { showConfirmUninstall = false },
+                title = { Text("Confirm Uninstall") },
+                text = { Text("Are you sure you want to uninstall $selectedPackage?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        ShizukuManager.uninstall(selectedPackage!!)
+                        showConfirmUninstall = false
+                    }) {
+                        Text("Uninstall")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showConfirmUninstall = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
     }
-}
 }
 
 @Composable
