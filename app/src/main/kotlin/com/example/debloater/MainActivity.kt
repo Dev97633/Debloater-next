@@ -14,9 +14,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
-import androidx.compose.material.PullRefreshIndicator
-import androidx.compose.material.pullRefresh
-import androidx.compose.material.rememberPullRefreshState
+import androidx.compose.material3.pulltorefresh.pullRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullRefreshState
+import androidx.compose.material3.pulltorefresh.PullRefreshIndicator
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
