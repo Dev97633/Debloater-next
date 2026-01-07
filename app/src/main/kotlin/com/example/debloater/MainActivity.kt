@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)  // Only this one is needed
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.example.debloater
 
@@ -13,8 +13,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,11 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
-import androidx.compose.material3.DockedSearchBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+
 
 class MainActivity : ComponentActivity() {
 
@@ -99,9 +98,17 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            DockedSearchBar(
+   Scaffold(
+    topBar = {
+        Column {
+            TopAppBar(
+                title = { Text("Debloater") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+            SearchBar(
                 query = query,
                 onQueryChange = { query = it },
                 onSearch = { active = false },
@@ -126,53 +133,78 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                             Icon(Icons.Default.Close, contentDescription = "Clear")
                         }
                     }
-                }
-            ) { }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(apps, key = { it.packageName }) { app ->
-                AppCard(
-                    app = app,
-                    pm = pm,
-                    onDisable = { ShizukuManager.disable(it) },
-                    onUninstall = { pkg ->
-                        selectedPackage = pkg
-                        showConfirmUninstall = true  // Opens confirmation dialog
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                // Optional: show recent searches or filtered suggestions here
+                LazyColumn {
+                    items(apps.take(10)) { app ->  // Show first 10 results as suggestions
+                        ListItem(
+                            headlineContent = { Text(app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName) },
+                            supportingContent = { Text(app.packageName) },
+                            leadingContent = {
+                                Image(
+                                    painter = rememberAsyncImagePainter(
+                                        remember(app.packageName) { app.applicationInfo?.loadIcon(pm) }
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                query = app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName
+                                active = false
+                            }
+                        )
                     }
-                )
+                }
             }
         }
-
-        // Confirmation dialog — now correctly inside the composable
-        if (showConfirmUninstall) {
-            AlertDialog(
-                onDismissRequest = { showConfirmUninstall = false },
-                title = { Text("Confirm Uninstall") },
-                text = { Text("Are you sure you want to uninstall $selectedPackage?") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        ShizukuManager.uninstall(selectedPackage!!)
-                        showConfirmUninstall = false
-                    }) {
-                        Text("Uninstall")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showConfirmUninstall = false }) {
-                        Text("Cancel")
-                    }
+    },
+    snackbarHost = { SnackbarHost(snackbarHostState) }
+) { paddingValues ->
+    LazyColumn(
+        modifier = Modifier.padding(paddingValues),
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(apps, key = { it.packageName }) { app ->
+            AppCard(
+                app = app,
+                pm = pm,
+                onDisable = { ShizukuManager.disable(it) },
+                onUninstall = { pkg ->
+                    selectedPackage = pkg
+                    showConfirmUninstall = true
                 }
             )
         }
     }
+
+    // Confirmation dialog
+    if (showConfirmUninstall) {
+        AlertDialog(
+            onDismissRequest = { showConfirmUninstall = false },
+            title = { Text("Confirm Uninstall") },
+            text = { Text("Are you sure you want to uninstall $selectedPackage?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    ShizukuManager.uninstall(selectedPackage!!)
+                    showConfirmUninstall = false
+                }) {
+                    Text("Uninstall")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmUninstall = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
 }
 
 @Composable
