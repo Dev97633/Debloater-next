@@ -14,9 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
-import androidx.compose.material3.pulltorefresh.pullRefresh
-import androidx.compose.material3.pulltorefresh.rememberPullRefreshState
-import androidx.compose.material3.pulltorefresh.PullRefreshIndicator
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -90,6 +88,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var showConfirmUninstall by remember { mutableStateOf(false) }
     var selectedPackage by remember { mutableStateOf<String?>(null) }
 
+    var isRefreshing by remember { mutableStateOf(false) }
+
     // Filter apps based on search query
     LaunchedEffect(query) {
         if (query.isEmpty()) {
@@ -101,16 +101,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
             }
         }
     }
-
-    // Pull-to-refresh state
-    val pullRefreshState = rememberPullRefreshState(
-        refreshing = false,
-        onRefresh = {
-            // Reload full app list on pull
-            apps = getInstalledApps(pm)
-            // Your LaunchedEffect(query) will automatically re-apply search filter
-        }
-    )
 
     Scaffold(
         topBar = {
@@ -178,7 +168,14 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        Box(modifier = Modifier.pullRefresh(pullRefreshState)) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                apps = getInstalledApps(pm)
+                isRefreshing = false
+            }
+        ) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -198,15 +195,9 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     )
                 }
             }
-
-            PullRefreshIndicator(
-                refreshing = false,
-                state = pullRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
         }
 
-        // Confirmation dialog (unchanged)
+        // Confirmation dialog
         if (showConfirmUninstall) {
             AlertDialog(
                 onDismissRequest = { showConfirmUninstall = false },
