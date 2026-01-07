@@ -260,10 +260,13 @@ fun SearchSuggestionItem(
         headlineContent = { Text(appMetadata.appName) },
         supportingContent = { Text(appMetadata.packageName) },
         leadingContent = {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            Image(
+                painter = rememberAsyncImagePainter(
+                    model = appMetadata.icon,
+                    contentScale = ContentScale.Fit
+                ),
+                contentDescription = null,
+                modifier = Modifier.size(40.dp)
             )
         },
         modifier = Modifier.clickable(onClick = onSelect)
