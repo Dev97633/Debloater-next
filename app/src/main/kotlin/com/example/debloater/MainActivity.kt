@@ -4,12 +4,15 @@ package com.example.debloater
 
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.ContentScale
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
@@ -27,6 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 
 class MainActivity : ComponentActivity() {
@@ -75,25 +81,42 @@ fun DebloaterTheme(
     )
 }
 
+// ✅ Data class to cache app metadata off-main thread
+data class AppMetadata(
+    val packageName: String,
+    val appName: String,
+    val icon: Drawable?,
+    val isSystem: Boolean
+)
+
 @Composable
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
     val pm = context.packageManager
-    val allApps = remember { getInstalledApps(pm) }
+    val scope = rememberCoroutineScope()
     
+    var allAppsMetadata by remember { mutableStateOf<List<AppMetadata>>(emptyList()) }
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var showConfirmUninstall by remember { mutableStateOf(false) }
     var selectedPackage by remember { mutableStateOf<String?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
 
-    // ✅ OPTIMIZED: Compute filtered apps only when query changes
-    val filteredApps = remember(query, allApps) {
+    // ✅ Load all app metadata on background thread ONCE
+    LaunchedEffect(Unit) {
+        scope.launch(Dispatchers.Default) {
+            val metadata = getInstalledAppsMetadata(pm)
+            allAppsMetadata = metadata
+        }
+    }
+
+    // ✅ Filter metadata (very fast, just string comparison)
+    val filteredApps = remember(query, allAppsMetadata) {
         if (query.isEmpty()) {
-            allApps
+            allAppsMetadata
         } else {
-            allApps.filter {
-                it.applicationInfo?.loadLabel(pm)?.toString()?.contains(query, ignoreCase = true) == true ||
+            allAppsMetadata.filter {
+                it.appName.contains(query, ignoreCase = true) ||
                 it.packageName.contains(query, ignoreCase = true)
             }
         }
@@ -107,7 +130,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 active = active,
                 onActiveChange = { active = it },
                 filteredApps = filteredApps,
-                pm = pm,
                 onAppSelected = { selectedAppLabel ->
                     query = selectedAppLabel
                     active = false
@@ -120,8 +142,10 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
             isRefreshing = isRefreshing,
             onRefresh = {
                 isRefreshing = true
-                // Refresh logic here
-                isRefreshing = false
+                scope.launch(Dispatchers.Default) {
+                    allAppsMetadata = getInstalledAppsMetadata(pm)
+                    isRefreshing = false
+                }
             }
         ) {
             LazyColumn(
@@ -131,10 +155,9 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 contentPadding = PaddingValues(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(filteredApps, key = { it.packageName }) { app ->
+                items(filteredApps, key = { it.packageName }) { appMetadata ->
                     AppCard(
-                        app = app,
-                        pm = pm,
+                        appMetadata = appMetadata,
                         onDisable = { ShizukuManager.disable(it) },
                         onUninstall = { pkg ->
                             selectedPackage = pkg
@@ -145,7 +168,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
             }
         }
 
-        // Confirmation dialog
         if (showConfirmUninstall) {
             AlertDialog(
                 onDismissRequest = { showConfirmUninstall = false },
@@ -175,8 +197,7 @@ fun DebloaterTopBar(
     onQueryChange: (String) -> Unit,
     active: Boolean,
     onActiveChange: (Boolean) -> Unit,
-    filteredApps: List<PackageInfo>,
-    pm: PackageManager,
+    filteredApps: List<AppMetadata>,
     onAppSelected: (String) -> Unit
 ) {
     Column {
@@ -217,24 +238,11 @@ fun DebloaterTopBar(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // ✅ Only show suggestions when active
             LazyColumn {
-                items(filteredApps.take(10)) { app ->
-                    ListItem(
-                        headlineContent = { Text(app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName) },
-                        supportingContent = { Text(app.packageName) },
-                        leadingContent = {
-                            Image(
-                                painter = rememberAsyncImagePainter(
-                                    remember(app.packageName) { app.applicationInfo?.loadIcon(pm) }
-                                ),
-                                contentDescription = null,
-                                modifier = Modifier.size(40.dp)
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            onAppSelected(app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName)
-                        }
+                items(filteredApps.take(10)) { appMetadata ->
+                    SearchSuggestionItem(
+                        appMetadata = appMetadata,
+                        onSelect = { onAppSelected(appMetadata.appName) }
                     )
                 }
             }
@@ -243,40 +251,34 @@ fun DebloaterTopBar(
 }
 
 @Composable
+fun SearchSuggestionItem(
+    appMetadata: AppMetadata,
+    onSelect: () -> Unit
+) {
+    ListItem(
+        headlineContent = { Text(appMetadata.appName) },
+        supportingContent = { Text(appMetadata.packageName) },
+        leadingContent = {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+        },
+        modifier = Modifier.clickable(onClick = onSelect)
+    )
+}
+
+@Composable
 fun AppCard(
-    app: PackageInfo,
-    pm: PackageManager,
+    appMetadata: AppMetadata,
     onDisable: (String) -> Unit,
     onUninstall: (String) -> Unit
 ) {
-    val appInfo = app.applicationInfo ?: return
-
-    // ✅ HARD CACHED — computed once per package, never recomputes on scroll
-    val appName = rememberSaveable(app.packageName) {
-        try {
-            appInfo.loadLabel(pm).toString()
-        } catch (e: Exception) {
-            app.packageName
-        }
-    }
-
-    val appIcon = remember(app.packageName) {
-        try {
-            appInfo.loadIcon(pm)
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    val isSystem = remember(app.packageName) {
-        (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
-        (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-    }
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSystem)
+            containerColor = if (appMetadata.isSystem)
                 MaterialTheme.colorScheme.surfaceVariant
             else
                 MaterialTheme.colorScheme.surface
@@ -288,8 +290,12 @@ fun AppCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // ✅ Lazy icon loading - loads after scroll stops
             Image(
-                painter = rememberAsyncImagePainter(appIcon),
+                painter = rememberAsyncImagePainter(
+                    model = appMetadata.icon,
+                    contentScale = ContentScale.Fit
+                ),
                 contentDescription = null,
                 modifier = Modifier
                     .size(48.dp)
@@ -298,12 +304,12 @@ fun AppCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = appName,
+                    text = appMetadata.appName,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1
                 )
                 Text(
-                    text = app.packageName,
+                    text = appMetadata.packageName,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
@@ -312,12 +318,12 @@ fun AppCard(
 
             Row {
                 OutlinedButton(
-                    onClick = { onDisable(app.packageName) },
+                    onClick = { onDisable(appMetadata.packageName) },
                     modifier = Modifier.padding(end = 8.dp)
                 ) {
                     Text("Disable")
                 }
-                Button(onClick = { onUninstall(app.packageName) }) {
+                Button(onClick = { onUninstall(appMetadata.packageName) }) {
                     Text("Uninstall")
                 }
             }
@@ -325,8 +331,27 @@ fun AppCard(
     }
 }
 
-private fun getInstalledApps(pm: PackageManager): List<PackageInfo> {
+// ✅ Pre-load all metadata on background thread
+private suspend fun getInstalledAppsMetadata(pm: PackageManager): List<AppMetadata> {
     return pm.getInstalledPackages(PackageManager.MATCH_ALL)
         .filter { it.applicationInfo != null }
-        .sortedBy { pm.getApplicationLabel(it.applicationInfo!!).toString().lowercase() }
+        .map { packageInfo ->
+            val appInfo = packageInfo.applicationInfo!!
+            AppMetadata(
+                packageName = packageInfo.packageName,
+                appName = try {
+                    appInfo.loadLabel(pm).toString()
+                } catch (e: Exception) {
+                    packageInfo.packageName
+                },
+                icon = try {
+                    appInfo.loadIcon(pm)
+                } catch (e: Exception) {
+                    null
+                },
+                isSystem = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                        (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+            )
+        }
+        .sortedBy { it.appName.lowercase() }
 }
