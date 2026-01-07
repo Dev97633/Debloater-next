@@ -28,6 +28,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.ui.text.style.TextAlign
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -91,6 +93,7 @@ data class AppMetadata(
 
 // -------------------- SCREEN --------------------
 
+// -------------------- NAVIGATION & SCREEN --------------------
 @Composable
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
@@ -100,8 +103,10 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
-
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
+
+    // Navigation state
+    var currentPage by rememberSaveable { mutableStateOf("apps") }  // "apps" or "about"
 
     // Load ONCE
     LaunchedEffect(Unit) {
@@ -130,43 +135,49 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 onSuggestionClick = {
                     query = it
                     active = false
-                }
+                },
+                currentPage = currentPage,
+                onNavigate = { currentPage = it }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-
-       PullToRefreshBox(
-    isRefreshing = isRefreshing,
-    onRefresh = {
-        scope.launch {
-            isRefreshing = true
-            allApps = loadApps(pm)
-            isRefreshing = false
+        when (currentPage) {
+            "apps" -> {
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = {
+                        scope.launch {
+                            isRefreshing = true
+                            allApps = loadApps(pm)
+                            isRefreshing = false
+                        }
+                    }
+                ) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                        contentPadding = PaddingValues(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            items = filteredApps,
+                            key = { it.packageName }
+                        ) { app ->
+                            AppCard(
+                                app = app,
+                                onDisable = { ShizukuManager.disable(it) },
+                                onUninstall = { confirmUninstall = it }
+                            )
+                        }
+                    }
+                }
+            }
+            "about" -> AboutScreen()
         }
-    }
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(padding),
-        contentPadding = PaddingValues(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(
-            items = filteredApps,
-            key = { it.packageName }
-        ) { app ->
-            AppCard(
-                app = app,
-                onDisable = { ShizukuManager.disable(it) },
-                onUninstall = { confirmUninstall = it }
-            )
-        }
-    }
-}
 
-
+        // Confirmation dialog
         confirmUninstall?.let { pkg ->
             AlertDialog(
                 onDismissRequest = { confirmUninstall = null },
@@ -188,8 +199,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     }
 }
 
-// -------------------- TOP BAR --------------------
-
+// -------------------- UPDATED TOP BAR WITH NAVIGATION --------------------
 @Composable
 fun DebloaterTopBar(
     query: String,
@@ -197,61 +207,147 @@ fun DebloaterTopBar(
     onQueryChange: (String) -> Unit,
     onActiveChange: (Boolean) -> Unit,
     suggestions: List<AppMetadata>,
-    onSuggestionClick: (String) -> Unit
+    onSuggestionClick: (String) -> Unit,
+    currentPage: String,
+    onNavigate: (String) -> Unit
 ) {
     Column {
-        TopAppBar(title = { Text("Debloater") })
-
-        SearchBar(
-            query = query,
-            onQueryChange = onQueryChange,
-            onSearch = { onActiveChange(false) },
-            active = active,
-            onActiveChange = onActiveChange,
-            placeholder = { Text("Search apps") },
-            leadingIcon = {
-                if (active) {
-                    IconButton(onClick = {
-                        onQueryChange("")
-                        onActiveChange(false)
-                    }) {
-                        Icon(Icons.Default.ArrowBack, null)
-                    }
-                } else {
-                    Icon(Icons.Default.Search, null)
-                }
-            },
-            trailingIcon = {
-                if (query.isNotBlank()) {
-                    IconButton(onClick = { onQueryChange("") }) {
-                        Icon(Icons.Default.Close, null)
+        TopAppBar(
+            title = { Text(if (currentPage == "about") "About" else "Debloater") },
+            navigationIcon = {
+                if (currentPage == "about") {
+                    IconButton(onClick = { onNavigate("apps") }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            LazyColumn {
-                items(suggestions, key = { it.packageName }) {
-                    ListItem(
-                        headlineContent = { Text(it.appName) },
-                        supportingContent = { Text(it.packageName) },
-                        leadingContent = {
-                            Image(
-                                painter = rememberAsyncImagePainter(it.icon),
-                                contentDescription = null,
-                                modifier = Modifier.size(40.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            onSuggestionClick(it.appName)
+            actions = {
+                if (currentPage == "apps") {
+                    IconButton(onClick = { onNavigate("about") }) {
+                        Icon(Icons.Default.Info, contentDescription = "About")
+                    }
+                }
+            }
+        )
+        if (currentPage == "apps") {
+            SearchBar(
+                query = query,
+                onQueryChange = onQueryChange,
+                onSearch = { onActiveChange(false) },
+                active = active,
+                onActiveChange = onActiveChange,
+                placeholder = { Text("Search apps") },
+                leadingIcon = {
+                    if (active) {
+                        IconButton(onClick = {
+                            onQueryChange("")
+                            onActiveChange(false)
+                        }) {
+                            Icon(Icons.Default.ArrowBack, null)
                         }
-                    )
+                    } else {
+                        Icon(Icons.Default.Search, null)
+                    }
+                },
+                trailingIcon = {
+                    if (query.isNotBlank()) {
+                        IconButton(onClick = { onQueryChange("") }) {
+                            Icon(Icons.Default.Close, null)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                LazyColumn {
+                    items(suggestions, key = { it.packageName }) {
+                        ListItem(
+                            headlineContent = { Text(it.appName) },
+                            supportingContent = { Text(it.packageName) },
+                            leadingContent = {
+                                Image(
+                                    painter = rememberAsyncImagePainter(it.icon),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(40.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                onSuggestionClick(it.appName)
+                            }
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+// -------------------- ABOUT SCREEN --------------------
+@Composable
+fun AboutScreen() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Debloater",
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = "Version 1.0 • January 2026",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(40.dp))
+        Text(
+            text = "A fast, clean, and modern debloater for Android.\nNo root required — powered by Shizuku.",
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.height(48.dp))
+        Text(
+            text = "Developed with ❤️ by",
+            style = MaterialTheme.typography.titleMedium
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Your Name",  // ← CHANGE THIS TO YOUR NAME OR GITHUB USERNAME
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(40.dp))
+        Text(
+            text = "Source code on GitHub:",
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "github.com/yourusername/Debloater",  // ← CHANGE TO YOUR REPO URL
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable {
+                // Optional: open in browser (add UriHandler if you want)
+            }
+        )
+        Spacer(Modifier.height(32.dp))
+        Text(
+            text = "Licensed under MIT",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Special thanks to Rikka for Shizuku ❤️",
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 
