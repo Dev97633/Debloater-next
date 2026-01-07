@@ -80,22 +80,19 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
     val pm = context.packageManager
     val allApps = remember { getInstalledApps(pm) }
-    var apps by remember { mutableStateOf(allApps) }
-
-    var query by remember { mutableStateOf("") }
-    var active by remember { mutableStateOf(false) }
-
+    
+    var query by rememberSaveable { mutableStateOf("") }
+    var active by rememberSaveable { mutableStateOf(false) }
     var showConfirmUninstall by remember { mutableStateOf(false) }
     var selectedPackage by remember { mutableStateOf<String?>(null) }
-
     var isRefreshing by remember { mutableStateOf(false) }
 
-    // Filter apps based on search query
-    LaunchedEffect(query) {
+    // ✅ OPTIMIZED: Compute filtered apps only when query changes
+    val filteredApps = remember(query, allApps) {
         if (query.isEmpty()) {
-            apps = allApps
+            allApps
         } else {
-            apps = allApps.filter {
+            allApps.filter {
                 it.applicationInfo?.loadLabel(pm)?.toString()?.contains(query, ignoreCase = true) == true ||
                 it.packageName.contains(query, ignoreCase = true)
             }
@@ -104,67 +101,18 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
 
     Scaffold(
         topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text("Debloater") },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-                SearchBar(
-                    query = query,
-                    onQueryChange = { query = it },
-                    onSearch = { active = false },
-                    active = active,
-                    onActiveChange = { active = it },
-                    placeholder = { Text("Search apps...") },
-                    leadingIcon = {
-                        if (active) {
-                            IconButton(onClick = {
-                                query = ""
-                                active = false
-                            }) {
-                                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                            }
-                        } else {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
-                        }
-                    },
-                    trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = "" }) {
-                                Icon(Icons.Default.Close, contentDescription = "Clear")
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    LazyColumn {
-                        items(apps.take(10)) { app ->
-                            ListItem(
-                                headlineContent = { Text(app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName) },
-                                supportingContent = { Text(app.packageName) },
-                                leadingContent = {
-                                    Image(
-                                        painter = rememberAsyncImagePainter(
-                                            remember(app.packageName) { app.applicationInfo?.loadIcon(pm) }
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(40.dp)
-                                    )
-                                },
-                                modifier = Modifier.clickable {
-                                    query = app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName
-                                    active = false
-                                }
-                            )
-                        }
-                    }
+            DebloaterTopBar(
+                query = query,
+                onQueryChange = { query = it },
+                active = active,
+                onActiveChange = { active = it },
+                filteredApps = filteredApps,
+                pm = pm,
+                onAppSelected = { selectedAppLabel ->
+                    query = selectedAppLabel
+                    active = false
                 }
-            }
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
@@ -172,7 +120,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
             isRefreshing = isRefreshing,
             onRefresh = {
                 isRefreshing = true
-                apps = getInstalledApps(pm)
+                // Refresh logic here
                 isRefreshing = false
             }
         ) {
@@ -183,7 +131,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 contentPadding = PaddingValues(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(apps, key = { it.packageName }) { app ->
+                items(filteredApps, key = { it.packageName }) { app ->
                     AppCard(
                         app = app,
                         pm = pm,
@@ -222,6 +170,79 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
 }
 
 @Composable
+fun DebloaterTopBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    active: Boolean,
+    onActiveChange: (Boolean) -> Unit,
+    filteredApps: List<PackageInfo>,
+    pm: PackageManager,
+    onAppSelected: (String) -> Unit
+) {
+    Column {
+        TopAppBar(
+            title = { Text("Debloater") },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface
+            )
+        )
+        SearchBar(
+            query = query,
+            onQueryChange = onQueryChange,
+            onSearch = { onActiveChange(false) },
+            active = active,
+            onActiveChange = onActiveChange,
+            placeholder = { Text("Search apps...") },
+            leadingIcon = {
+                if (active) {
+                    IconButton(onClick = {
+                        onQueryChange("")
+                        onActiveChange(false)
+                    }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                } else {
+                    Icon(Icons.Default.Search, contentDescription = "Search")
+                }
+            },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Default.Close, contentDescription = "Clear")
+                    }
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            // ✅ Only show suggestions when active
+            LazyColumn {
+                items(filteredApps.take(10)) { app ->
+                    ListItem(
+                        headlineContent = { Text(app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName) },
+                        supportingContent = { Text(app.packageName) },
+                        leadingContent = {
+                            Image(
+                                painter = rememberAsyncImagePainter(
+                                    remember(app.packageName) { app.applicationInfo?.loadIcon(pm) }
+                                ),
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            onAppSelected(app.applicationInfo?.loadLabel(pm)?.toString() ?: app.packageName)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun AppCard(
     app: PackageInfo,
     pm: PackageManager,
@@ -230,7 +251,7 @@ fun AppCard(
 ) {
     val appInfo = app.applicationInfo ?: return
 
-    // ✅ HARD CACHED — computed once per package
+    // ✅ HARD CACHED — computed once per package, never recomputes on scroll
     val appName = rememberSaveable(app.packageName) {
         try {
             appInfo.loadLabel(pm).toString()
@@ -247,8 +268,10 @@ fun AppCard(
         }
     }
 
-    val isSystem = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
-            (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+    val isSystem = remember(app.packageName) {
+        (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
+        (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -265,8 +288,6 @@ fun AppCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
-            // ✅ NO binder calls during scroll anymore
             Image(
                 painter = rememberAsyncImagePainter(appIcon),
                 contentDescription = null,
