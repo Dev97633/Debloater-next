@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.text.style.TextAlign
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.Dispatchers
@@ -105,21 +107,21 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
 
-    // Navigation state
-    var currentPage by rememberSaveable { mutableStateOf("apps") }  // "apps" or "about"
+    // Navigation
+    var currentScreen by rememberSaveable { mutableStateOf("apps") }  // "apps" or "about"
 
     // Load ONCE
     LaunchedEffect(Unit) {
         allApps = loadApps(pm)
     }
 
-    // FAST derived filter
+    // Filter
     val filteredApps by remember {
         derivedStateOf {
             if (query.isBlank()) allApps
             else allApps.filter {
                 it.appName.contains(query, true) ||
-                        it.packageName.contains(query, true)
+                it.packageName.contains(query, true)
             }
         }
     }
@@ -136,13 +138,13 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     query = it
                     active = false
                 },
-                currentPage = currentPage,
-                onNavigate = { currentPage = it }
+                currentScreen = currentScreen,
+                onNavigate = { currentScreen = it }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        when (currentPage) {
+        when (currentScreen) {
             "apps" -> {
                 PullToRefreshBox(
                     isRefreshing = isRefreshing,
@@ -161,10 +163,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                         contentPadding = PaddingValues(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(
-                            items = filteredApps,
-                            key = { it.packageName }
-                        ) { app ->
+                        items(filteredApps, key = { it.packageName }) { app ->
                             AppCard(
                                 app = app,
                                 onDisable = { ShizukuManager.disable(it) },
@@ -208,28 +207,28 @@ fun DebloaterTopBar(
     onActiveChange: (Boolean) -> Unit,
     suggestions: List<AppMetadata>,
     onSuggestionClick: (String) -> Unit,
-    currentPage: String,
+    currentScreen: String,
     onNavigate: (String) -> Unit
 ) {
     Column {
         TopAppBar(
-            title = { Text(if (currentPage == "about") "About" else "Debloater") },
+            title = { Text(if (currentScreen == "about") "About" else "Debloater") },
             navigationIcon = {
-                if (currentPage == "about") {
+                if (currentScreen == "about") {
                     IconButton(onClick = { onNavigate("apps") }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
             },
             actions = {
-                if (currentPage == "apps") {
+                if (currentScreen == "apps") {
                     IconButton(onClick = { onNavigate("about") }) {
                         Icon(Icons.Default.Info, contentDescription = "About")
                     }
                 }
             }
         )
-        if (currentPage == "apps") {
+        if (currentScreen == "apps") {
             SearchBar(
                 query = query,
                 onQueryChange = onQueryChange,
@@ -290,9 +289,9 @@ fun AboutScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "Debloater",
@@ -301,54 +300,64 @@ fun AboutScreen() {
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            text = "Version 1.0 • January 2026",
+            text = "Version 1.0",
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Spacer(Modifier.height(32.dp))
+        Text(
+            text = "A fast, clean debloater for Android.\nNo root required — powered by Shizuku.",
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(40.dp))
-        Text(
-            text = "A fast, clean, and modern debloater for Android.\nNo root required — powered by Shizuku.",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.height(48.dp))
-        Text(
-            text = "Developed with ❤️ by",
-            style = MaterialTheme.typography.titleMedium
-        )
+        Text("Developed by", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Your Name",  // ← CHANGE THIS TO YOUR NAME OR GITHUB USERNAME
+            text = "DEV",  
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.primary
         )
         Spacer(Modifier.height(40.dp))
-        Text(
-            text = "Source code on GitHub:",
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "github.com/yourusername/Debloater",  // ← CHANGE TO YOUR REPO URL
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.clickable {
-                // Optional: open in browser (add UriHandler if you want)
+
+        // Device Specs Section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Device Information", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                DeviceSpecRow("Model", "${Build.MANUFACTURER} ${Build.MODEL}")
+                DeviceSpecRow("Device", Build.DEVICE)
+                DeviceSpecRow("Brand", Build.BRAND)
+                DeviceSpecRow("Android Version", Build.VERSION.RELEASE)
+                DeviceSpecRow("API Level", Build.VERSION.SDK_INT.toString())
+                DeviceSpecRow("Build ID", Build.ID)
+                DeviceSpecRow("Fingerprint", Build.FINGERPRINT.take(50) + "...")  
             }
-        )
+        }
         Spacer(Modifier.height(32.dp))
-        Text(
-            text = "Licensed under MIT",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text("Source code:", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Special thanks to Rikka for Shizuku ❤️",
-            style = MaterialTheme.typography.bodyMedium
+            text = "github.com/Dev97633/Debloater",  // ← CHANGE TO YOUR REPO
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.primary
         )
+        Spacer(Modifier.height(24.dp))
+        Text("MIT Licensed", style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.height(8.dp))
+        Text("Thanks to Rikka for Shizuku ❤️", style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+@Composable
+fun DeviceSpecRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Spacer(Modifier.height(4.dp))
 }
 
 // -------------------- CARD --------------------
