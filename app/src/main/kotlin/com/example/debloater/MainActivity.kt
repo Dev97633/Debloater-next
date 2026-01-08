@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.activity.OnBackPressedCallback
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -85,29 +86,50 @@ data class AppData(
 @Composable
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
+    val activity = (LocalContext.current as ComponentActivity)
     val pm = context.packageManager
     val scope = rememberCoroutineScope()
-    var allAppData by remember { mutableStateOf<List<AppData>>(emptyList()) }
+    var allApps by remember { mutableStateOf<List<AppMetadata>>(emptyList()) }
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
-    var selectedApp by remember { mutableStateOf<AppData?>(null) }
-
+    var selectedApp by rememberSaveable<AppMetadata?>(null) { mutableStateOf(null) }
 
     LaunchedEffect(Unit) {
-        allAppData = loadAppData(pm)
+        allApps = loadApps(pm)
     }
 
-    val filteredAppData by remember {
+    val filteredApps by remember {
         derivedStateOf {
-            if (query.isBlank()) allAppData
-            else allAppData.filter {
-                it.appName.contains(query, ignoreCase = true) ||
-                it.packageName.contains(query, ignoreCase = true)
+            if (query.isBlank()) allApps
+            else allApps.filter {
+                it.appName.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true)
             }
         }
+    }
+
+    val backCallback = remember {
+        object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                when (currentScreen) {
+                    "apps" -> {
+                        isEnabled = false
+                        activity.onBackPressed()
+                    }
+                    "details", "about" -> {
+                        currentScreen = "apps"
+                        selectedApp = null
+                    }
+                }
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        activity.onBackPressedDispatcher.addCallback(backCallback)
+        onDispose { backCallback.remove() }
     }
 
     Scaffold(
@@ -117,8 +139,11 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 active = active,
                 onQueryChange = { query = it },
                 onActiveChange = { active = it },
-                suggestions = filteredAppData.take(10),
-                onSuggestionClick = { query = it; active = false },
+                suggestions = filteredApps.take(10),
+                onSuggestionClick = {
+                    query = it
+                    active = false
+                },
                 currentScreen = currentScreen,
                 onNavigate = { currentScreen = it },
                 onBack = {
@@ -144,7 +169,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                         onRefresh = {
                             scope.launch {
                                 isRefreshing = true
-                                allAppData = loadAppData(pm)
+                                allApps = loadApps(pm)
                                 isRefreshing = false
                             }
                         }
@@ -154,15 +179,15 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                             contentPadding = PaddingValues(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(filteredAppData, key = { it.packageName }) { appData ->
+                            items(filteredApps, key = { it.packageName }) { app ->
                                 AppCard(
-                                    appData = appData,
+                                    app = app,
                                     onClick = {
-                                        selectedApp = appData
+                                        selectedApp = app
                                         currentScreen = "details"
                                     },
-                                    onDisable = { ShizukuManager.disable(appData.packageName) },
-                                    onUninstall = { confirmUninstall = appData.packageName }
+                                    onDisable = { ShizukuManager.disable(app.packageName) },
+                                    onUninstall = { confirmUninstall = app.packageName }
                                 )
                             }
                         }
@@ -170,7 +195,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 }
                 "details" -> selectedApp?.let { app ->
                     AppDetailsScreen(
-                        appData = app,
+                        app = app,
                         onBack = {
                             currentScreen = "apps"
                             selectedApp = null
@@ -192,7 +217,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     TextButton(onClick = {
                         scope.launch {
                             ShizukuManager.uninstall(pkg)
-                            allAppData = allAppData.filter { it.packageName != pkg }
+                            allApps = allApps.filter { it.packageName != pkg }
                         }
                         confirmUninstall = null
                     }) { Text("Uninstall") }
