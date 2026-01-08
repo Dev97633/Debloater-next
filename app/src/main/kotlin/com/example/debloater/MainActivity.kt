@@ -94,7 +94,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
-    var selectedApp by rememberSaveable<AppData?>(null) { mutableStateOf(null) }
+    var selectedApp by remember { mutableStateOf<AppData?>(null) }
+
 
     // Handle system back button
     val backCallback = remember {
