@@ -118,7 +118,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
 
-    // Load only basic app data initially
     LaunchedEffect(Unit) {
         allAppData = loadAppData(pm)
     }
@@ -127,7 +126,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         derivedStateOf {
             if (query.isBlank()) allAppData
             else allAppData.filter {
-                it.appName.contains(query, ignoreCase = true) || 
+                it.appName.contains(query, ignoreCase = true) ||
                 it.packageName.contains(query, ignoreCase = true)
             }
         }
@@ -140,7 +139,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 active = active,
                 onQueryChange = { query = it },
                 onActiveChange = { active = it },
-                suggestions = emptyList(), // Simplified suggestions to reduce lag
+                suggestions = filteredAppData.take(10),  // Now using AppData
                 onSuggestionClick = {
                     query = it
                     active = false
@@ -174,19 +173,13 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                         LazyColumn(
                             modifier = Modifier.padding(padding),
                             contentPadding = PaddingValues(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            state = rememberLazyListState()
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(
-                                items = filteredAppData,
-                                key = { it.packageName },
-                                contentType = { it.isSystem }
-                            ) { appData ->
+                            items(filteredAppData, key = { it.packageName }) { appData ->
                                 AppCardComposable(
                                     appData = appData,
                                     onDisable = { ShizukuManager.disable(it) },
-                                    onUninstall = { confirmUninstall = it },
-                                    modifier = Modifier.animateItem() // Smooth item animations
+                                    onUninstall = { confirmUninstall = it }
                                 )
                             }
                         }
@@ -205,7 +198,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     TextButton(onClick = {
                         scope.launch {
                             ShizukuManager.uninstall(pkg)
-                            // Remove from list after uninstall
                             allAppData = allAppData.filter { it.packageName != pkg }
                         }
                         confirmUninstall = null
@@ -220,143 +212,12 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
 }
 
 @Composable
-fun AppCardComposable(
-    appData: AppData,
-    onDisable: (String) -> Unit,
-    onUninstall: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val pm = context.packageManager
-    
-    // Load icon lazily with caching
-    val icon by remember(appData.packageName) {
-        derivedStateOf {
-            try {
-                val appInfo = pm.getApplicationInfo(appData.packageName, 0)
-                appInfo.loadIcon(pm)
-            } catch (e: Exception) {
-                null
-            }
-        }
-    }
-    
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (appData.isSystem) MaterialTheme.colorScheme.surfaceVariant 
-                           else MaterialTheme.colorScheme.surface
-        ),
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Optimized icon loading with fallback
-            Box(
-                modifier = Modifier.size(48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (icon != null) {
-                    AsyncImage(
-                        model = icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        contentScale = ContentScale.Fit
-                    )
-                } else {
-                    // Fallback placeholder
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            appData.appName.take(1).uppercase(),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-            
-            Spacer(Modifier.width(16.dp))
-            
-            Column(Modifier.weight(1f)) {
-                Text(
-                    appData.appName,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    appData.packageName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            
-            // Buttons with immediate feedback
-            var isDisabling by remember { mutableStateOf(false) }
-            var isUninstalling by remember { mutableStateOf(false) }
-            
-            OutlinedButton(
-                onClick = {
-                    isDisabling = true
-                    onDisable(appData.packageName)
-                    isDisabling = false
-                },
-                enabled = !isDisabling && !isUninstalling
-            ) {
-                if (isDisabling) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("Disable")
-                }
-            }
-            
-            Spacer(Modifier.width(8.dp))
-            
-            Button(
-                onClick = {
-                    isUninstalling = true
-                    onUninstall(appData.packageName)
-                    isUninstalling = false
-                },
-                enabled = !isDisabling && !isUninstalling
-            ) {
-                if (isUninstalling) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text("Uninstall")
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun DebloaterTopBar(
     query: String,
     active: Boolean,
     onQueryChange: (String) -> Unit,
     onActiveChange: (Boolean) -> Unit,
-    suggestions: List<AppMetadata>,
+    suggestions: List<AppData>,  // Changed to AppData
     onSuggestionClick: (String) -> Unit,
     currentScreen: String,
     onNavigate: (String) -> Unit
@@ -410,18 +271,33 @@ fun DebloaterTopBar(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // Simplified suggestions to reduce lag
-                if (suggestions.isNotEmpty()) {
-                    LazyColumn {
-                        items(suggestions, key = { it.packageName }) {
-                            ListItem(
-                                headlineContent = { Text(it.appName) },
-                                supportingContent = { Text(it.packageName) },
-                                modifier = Modifier.clickable {
-                                    onSuggestionClick(it.appName)
+                LazyColumn {
+                    items(suggestions, key = { it.packageName }) { appData ->
+                        ListItem(
+                            headlineContent = { Text(appData.appName) },
+                            supportingContent = { Text(appData.packageName) },
+                            leadingContent = {
+                                // Fallback placeholder since iconResId is not used
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.surfaceVariant,
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        appData.appName.take(1).uppercase(),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
-                            )
-                        }
+                            },
+                            modifier = Modifier.clickable {
+                                onSuggestionClick(appData.appName)
+                            }
+                        )
                     }
                 }
             }
