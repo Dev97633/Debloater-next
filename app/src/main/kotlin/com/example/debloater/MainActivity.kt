@@ -186,7 +186,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                     appData = appData,
                                     onDisable = { ShizukuManager.disable(it) },
                                     onUninstall = { confirmUninstall = it },
-                                    modifier = Modifier.animateItemPlacement() // Smooth item animations
+                                    modifier = Modifier.animateItem() // Smooth item animations
                                 )
                             }
                         }
