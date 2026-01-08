@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
 package com.example.debloater
 
 import android.os.Build
@@ -19,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import coil.compose.rememberAsyncImagePainter
-
 
 @Composable
 fun AppDetailsScreen(
@@ -64,7 +62,6 @@ fun AppDetailsScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Large circular icon
             Box(
                 modifier = Modifier
                     .size(120.dp)
@@ -123,7 +120,6 @@ fun AppDetailsScreen(
 
             Spacer(Modifier.height(48.dp))
 
-            // Action Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -138,10 +134,7 @@ fun AppDetailsScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     if (isDisabling) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(8.dp))
                     }
                     Text("Disable")
@@ -157,11 +150,7 @@ fun AppDetailsScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     if (isUninstalling) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                         Spacer(Modifier.width(8.dp))
                     }
                     Text("Uninstall")
