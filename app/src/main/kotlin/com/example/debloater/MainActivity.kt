@@ -238,13 +238,26 @@ fun DebloaterTopBar(
     onNavigate: (String) -> Unit,
     onBack: () -> Unit
 ) {
+    val showBack = currentScreen != "apps"
+
     Column {
         TopAppBar(
-            title = { Text(if (currentScreen == "about") "About" else "Debloater") },
+            title = {
+                Text(
+                    when (currentScreen) {
+                        "details" -> "App details"
+                        "about" -> "About"
+                        else -> "Debloater"
+                    }
+                )
+            },
             navigationIcon = {
-                if (currentScreen != "apps") {
+                if (showBack) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back"
+                        )
                     }
                 }
             },
@@ -256,6 +269,8 @@ fun DebloaterTopBar(
                 }
             }
         )
+
+        // 🔍 Search ONLY on apps screen
         if (currentScreen == "apps") {
             SearchBar(
                 query = query,
@@ -292,20 +307,6 @@ fun DebloaterTopBar(
                         ListItem(
                             headlineContent = { Text(appData.appName) },
                             supportingContent = { Text(appData.packageName) },
-                            leadingContent = {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        appData.appName.take(1).uppercase(),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            },
                             modifier = Modifier.clickable {
                                 onSuggestionClick(appData.appName)
                             }
