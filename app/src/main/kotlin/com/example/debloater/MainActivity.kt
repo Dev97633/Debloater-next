@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.ui.graphics.asImageBitmap
+import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -36,12 +38,29 @@ import kotlinx.coroutines.withContext
 import androidx.compose.runtime.Immutable
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
+import android.graphics.Bitmap
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 
+// Add these data classes to better structure the app data
+@Immutable
+data class AppData(
+    val packageName: String,
+    val appName: String,
+    val isSystem: Boolean,
+    val iconResId: Int? = null
+)
+
+@Immutable
+data class AppMetadata(
+    val packageName: String,
+    val appName: String,
+    val icon: Drawable?,
+    val isSystem: Boolean
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,35 +100,29 @@ fun DebloaterTheme(
     MaterialTheme(colorScheme = scheme, content = content)
 }
 
-@Immutable
-data class AppMetadata(
-    val packageName: String,
-    val appName: String,
-    val icon: Drawable?,
-    val isSystem: Boolean
-)
-
 @Composable
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
     val pm = context.packageManager
     val scope = rememberCoroutineScope()
-    var allApps by remember { mutableStateOf<List<AppMetadata>>(emptyList()) }
+    var allAppData by remember { mutableStateOf<List<AppData>>(emptyList()) }
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
 
+    // Load only basic app data initially
     LaunchedEffect(Unit) {
-        allApps = loadApps(pm)
+        allAppData = loadAppData(pm)
     }
 
-    val filteredApps by remember {
+    val filteredAppData by remember {
         derivedStateOf {
-            if (query.isBlank()) allApps
-            else allApps.filter {
-                it.appName.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true)
+            if (query.isBlank()) allAppData
+            else allAppData.filter {
+                it.appName.contains(query, ignoreCase = true) || 
+                it.packageName.contains(query, ignoreCase = true)
             }
         }
     }
@@ -121,7 +134,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 active = active,
                 onQueryChange = { query = it },
                 onActiveChange = { active = it },
-                suggestions = filteredApps.take(10),
+                suggestions = emptyList(), // Simplified suggestions to reduce lag
                 onSuggestionClick = {
                     query = it
                     active = false
@@ -147,7 +160,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                         onRefresh = {
                             scope.launch {
                                 isRefreshing = true
-                                allApps = loadApps(pm)
+                                allAppData = loadAppData(pm)
                                 isRefreshing = false
                             }
                         }
@@ -155,13 +168,19 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                         LazyColumn(
                             modifier = Modifier.padding(padding),
                             contentPadding = PaddingValues(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            state = rememberLazyListState()
                         ) {
-                            items(filteredApps, key = { it.packageName }) { app ->
-                                AppCard(
-                                    app = app,
+                            items(
+                                items = filteredAppData,
+                                key = { it.packageName },
+                                contentType = { it.isSystem }
+                            ) { appData ->
+                                AppCardComposable(
+                                    appData = appData,
                                     onDisable = { ShizukuManager.disable(it) },
-                                    onUninstall = { confirmUninstall = it }
+                                    onUninstall = { confirmUninstall = it },
+                                    modifier = Modifier.animateItemPlacement() // Smooth item animations
                                 )
                             }
                         }
@@ -178,7 +197,11 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 text = { Text("Uninstall $pkg ?") },
                 confirmButton = {
                     TextButton(onClick = {
-                        ShizukuManager.uninstall(pkg)
+                        scope.launch {
+                            ShizukuManager.uninstall(pkg)
+                            // Remove from list after uninstall
+                            allAppData = allAppData.filter { it.packageName != pkg }
+                        }
                         confirmUninstall = null
                     }) { Text("Uninstall") }
                 },
@@ -186,6 +209,137 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     TextButton(onClick = { confirmUninstall = null }) { Text("Cancel") }
                 }
             )
+        }
+    }
+}
+
+@Composable
+fun AppCardComposable(
+    appData: AppData,
+    onDisable: (String) -> Unit,
+    onUninstall: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val pm = context.packageManager
+    
+    // Load icon lazily with caching
+    val icon by remember(appData.packageName) {
+        derivedStateOf {
+            try {
+                val appInfo = pm.getApplicationInfo(appData.packageName, 0)
+                appInfo.loadIcon(pm)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+    
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (appData.isSystem) MaterialTheme.colorScheme.surfaceVariant 
+                           else MaterialTheme.colorScheme.surface
+        ),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Optimized icon loading with fallback
+            Box(
+                modifier = Modifier.size(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (icon != null) {
+                    AsyncImage(
+                        model = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    // Fallback placeholder
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            appData.appName.take(1).uppercase(),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            
+            Spacer(Modifier.width(16.dp))
+            
+            Column(Modifier.weight(1f)) {
+                Text(
+                    appData.appName,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    appData.packageName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            // Buttons with immediate feedback
+            var isDisabling by remember { mutableStateOf(false) }
+            var isUninstalling by remember { mutableStateOf(false) }
+            
+            OutlinedButton(
+                onClick = {
+                    isDisabling = true
+                    onDisable(appData.packageName)
+                    isDisabling = false
+                },
+                enabled = !isDisabling && !isUninstalling
+            ) {
+                if (isDisabling) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Disable")
+                }
+            }
+            
+            Spacer(Modifier.width(8.dp))
+            
+            Button(
+                onClick = {
+                    isUninstalling = true
+                    onUninstall(appData.packageName)
+                    isUninstalling = false
+                },
+                enabled = !isDisabling && !isUninstalling
+            ) {
+                if (isUninstalling) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Uninstall")
+                }
+            }
         }
     }
 }
@@ -250,23 +404,18 @@ fun DebloaterTopBar(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                LazyColumn {
-                    items(suggestions, key = { it.packageName }) {
-                        ListItem(
-                            headlineContent = { Text(it.appName) },
-                            supportingContent = { Text(it.packageName) },
-                            leadingContent = {
-                                Image(
-                                    painter = rememberAsyncImagePainter(it.icon),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(40.dp),
-                                    contentScale = ContentScale.Fit
-                                )
-                            },
-                            modifier = Modifier.clickable {
-                                onSuggestionClick(it.appName)
-                            }
-                        )
+                // Simplified suggestions to reduce lag
+                if (suggestions.isNotEmpty()) {
+                    LazyColumn {
+                        items(suggestions, key = { it.packageName }) {
+                            ListItem(
+                                headlineContent = { Text(it.appName) },
+                                supportingContent = { Text(it.packageName) },
+                                modifier = Modifier.clickable {
+                                    onSuggestionClick(it.appName)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -274,50 +423,33 @@ fun DebloaterTopBar(
     }
 }
 
-@Composable
-fun AppCard(
-    app: AppMetadata,
-    onDisable: (String) -> Unit,
-    onUninstall: (String) -> Unit
-) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (app.isSystem) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Image(
-                painter = rememberAsyncImagePainter(app.icon),
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                contentScale = ContentScale.Fit
-            )
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(app.appName, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                Text(
-                    app.packageName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
-            OutlinedButton(onClick = { onDisable(app.packageName) }) {
-                Text("Disable")
-            }
-            Spacer(Modifier.width(8.dp))
-            Button(onClick = { onUninstall(app.packageName) }) {
-                Text("Uninstall")
-            }
+// Load only basic app data without icons initially
+private suspend fun loadAppData(pm: PackageManager): List<AppData> =
+    withContext(Dispatchers.IO) { // Use IO dispatcher for heavy operations
+        try {
+            pm.getInstalledPackages(PackageManager.MATCH_ALL)
+                .asSequence()
+                .mapNotNull { pkg ->
+                    val app = pkg.applicationInfo ?: return@mapNotNull null
+                    AppData(
+                        packageName = pkg.packageName,
+                        appName = runCatching { app.loadLabel(pm).toString() }
+                            .getOrElse { pkg.packageName },
+                        isSystem = app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
+                                app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
+                        iconResId = app.icon
+                    )
+                }
+                .sortedBy { it.appName.lowercase() }
+                .toList()
+        } catch (e: Exception) {
+            emptyList()
         }
     }
-}
 
+// Keep the old loadApps function if needed elsewhere
 private suspend fun loadApps(pm: PackageManager): List<AppMetadata> =
-    withContext(Dispatchers.Default) {
+    withContext(Dispatchers.IO) {
         pm.getInstalledPackages(PackageManager.MATCH_ALL)
             .asSequence()
             .mapNotNull { pkg ->
