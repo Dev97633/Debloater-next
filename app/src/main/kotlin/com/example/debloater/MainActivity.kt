@@ -11,6 +11,9 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -93,7 +96,10 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
+
+    // Navigation + selected app
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
+    var selectedApp by rememberSaveable<AppData?>(stateSaver = AppDataSaver()) { mutableStateOf(null) }
 
     LaunchedEffect(Unit) {
         allAppData = loadAppData(pm)
@@ -117,9 +123,13 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 onQueryChange = { query = it },
                 onActiveChange = { active = it },
                 suggestions = filteredAppData.take(10),
-                onSuggestionClick = { query = it; active = false },
+                onSuggestionClick = {
+                    query = it
+                    active = false
+                },
                 currentScreen = currentScreen,
-                onNavigate = { currentScreen = it }
+                onNavigate = { currentScreen = it },
+                onBack = { currentScreen = "apps"; selectedApp = null }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -127,7 +137,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         AnimatedContent(
             targetState = currentScreen,
             transitionSpec = {
-                (fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left))
+                fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left)
                     .togetherWith(fadeOut(tween(300)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right))
             },
             label = "screen_transition"
@@ -150,8 +160,12 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(filteredAppData, key = { it.packageName }) { appData ->
-                                AppCard(  // Now defined below
+                                AppCard(
                                     appData = appData,
+                                    onClick = {
+                                        selectedApp = appData
+                                        currentScreen = "details"
+                                    },
                                     onDisable = { ShizukuManager.disable(appData.packageName) },
                                     onUninstall = { confirmUninstall = appData.packageName }
                                 )
@@ -159,6 +173,17 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                         }
                     }
                 }
+                "details" -> selectedApp?.let { app ->
+                    AppDetailsScreen(
+                        appData = app,
+                        onBack = {
+                            currentScreen = "apps"
+                            selectedApp = null
+                        },
+                        onDisable = { ShizukuManager.disable(app.packageName) },
+                        onUninstall = { confirmUninstall = app.packageName }
+                    )
+                } ?: Box(Modifier.fillMaxSize()) // Fallback
                 "about" -> AboutScreen()
             }
         }
@@ -278,6 +303,7 @@ fun DebloaterTopBar(
 @Composable
 fun AppCard(
     appData: AppData,
+    onClick: () -> Unit,
     onDisable: (String) -> Unit,
     onUninstall: (String) -> Unit
 ) {
@@ -298,7 +324,8 @@ fun AppCard(
     Card(
         colors = CardDefaults.cardColors(
             containerColor = if (appData.isSystem) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
-        )
+        ),
+        modifier = Modifier.clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
@@ -335,7 +362,11 @@ fun AppCard(
 
             Spacer(Modifier.width(16.dp))
 
-            Column(Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onClick)
+            ) {
                 Text(
                     text = appData.appName,
                     style = MaterialTheme.typography.titleMedium,
