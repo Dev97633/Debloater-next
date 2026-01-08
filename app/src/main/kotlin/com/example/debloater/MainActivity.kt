@@ -11,9 +11,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -82,8 +79,7 @@ fun DebloaterTheme(
 data class AppData(
     val packageName: String,
     val appName: String,
-    val isSystem: Boolean,
-    val iconResId: Int? = null
+    val isSystem: Boolean
 )
 
 @Composable
@@ -96,10 +92,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
-
-    // Navigation + selected app
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
-    var selectedApp by rememberSaveable<AppData?>(stateSaver = AppDataSaver()) { mutableStateOf(null) }
+    var selectedApp by rememberSaveable<AppData?>(null) { mutableStateOf(null) }
 
     LaunchedEffect(Unit) {
         allAppData = loadAppData(pm)
@@ -123,13 +117,13 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 onQueryChange = { query = it },
                 onActiveChange = { active = it },
                 suggestions = filteredAppData.take(10),
-                onSuggestionClick = {
-                    query = it
-                    active = false
-                },
+                onSuggestionClick = { query = it; active = false },
                 currentScreen = currentScreen,
                 onNavigate = { currentScreen = it },
-                onBack = { currentScreen = "apps"; selectedApp = null }
+                onBack = {
+                    currentScreen = "apps"
+                    selectedApp = null
+                }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -137,7 +131,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         AnimatedContent(
             targetState = currentScreen,
             transitionSpec = {
-                fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left)
+                (fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left))
                     .togetherWith(fadeOut(tween(300)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right))
             },
             label = "screen_transition"
@@ -183,7 +177,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                         onDisable = { ShizukuManager.disable(app.packageName) },
                         onUninstall = { confirmUninstall = app.packageName }
                     )
-                } ?: Box(Modifier.fillMaxSize()) // Fallback
+                } ?: Box(Modifier.fillMaxSize())
                 "about" -> AboutScreen()
             }
         }
@@ -219,14 +213,15 @@ fun DebloaterTopBar(
     suggestions: List<AppData>,
     onSuggestionClick: (String) -> Unit,
     currentScreen: String,
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    onBack: () -> Unit
 ) {
     Column {
         TopAppBar(
             title = { Text(if (currentScreen == "about") "About" else "Debloater") },
             navigationIcon = {
                 if (currentScreen == "about") {
-                    IconButton(onClick = { onNavigate("apps") }) {
+                    IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
