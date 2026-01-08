@@ -2,30 +2,46 @@
 
 package com.example.debloater
 
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Info
 import coil.compose.rememberAsyncImagePainter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.Immutable
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,6 +81,14 @@ fun DebloaterTheme(
     MaterialTheme(colorScheme = scheme, content = content)
 }
 
+@Immutable
+data class AppMetadata(
+    val packageName: String,
+    val appName: String,
+    val icon: Drawable?,
+    val isSystem: Boolean
+)
+
 @Composable
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
@@ -75,7 +99,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
-    var currentScreen by rememberSaveable { mutableStateOf("apps") }  // "apps" or "about"
+    var currentScreen by rememberSaveable { mutableStateOf("apps") }
 
     LaunchedEffect(Unit) {
         allApps = loadApps(pm)
@@ -85,7 +109,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         derivedStateOf {
             if (query.isBlank()) allApps
             else allApps.filter {
-                it.appName.contains(query, true) || it.packageName.contains(query, true)
+                it.appName.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true)
             }
         }
     }
@@ -111,18 +135,10 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         AnimatedContent(
             targetState = currentScreen,
             transitionSpec = {
-                val duration = 300
-                (fadeIn(animationSpec = tween(duration)) + slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(duration)
-                )).togetherWith(
-                    fadeOut(animationSpec = tween(duration)) + slideOutOfContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(duration)
-                    )
-                )
+                (fadeIn(animationSpec = tween(300)) + slideIntoContainer(towards = AnimatedContentTransitionScope.SlideDirection.Left))
+                    .togetherWith(fadeOut(animationSpec = tween(300)) + slideOutOfContainer(towards = AnimatedContentTransitionScope.SlideDirection.Right))
             },
-            label = "smooth_screen_transition"
+            label = "screen_animation"
         ) { screen ->
             when (screen) {
                 "apps" -> {
@@ -243,7 +259,8 @@ fun DebloaterTopBar(
                                 Image(
                                     painter = rememberAsyncImagePainter(it.icon),
                                     contentDescription = null,
-                                    modifier = Modifier.size(40.dp)
+                                    modifier = Modifier.size(40.dp),
+                                    contentScale = ContentScale.Fit
                                 )
                             },
                             modifier = Modifier.clickable {
@@ -256,3 +273,63 @@ fun DebloaterTopBar(
         }
     }
 }
+
+@Composable
+fun AppCard(
+    app: AppMetadata,
+    onDisable: (String) -> Unit,
+    onUninstall: (String) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (app.isSystem) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = rememberAsyncImagePainter(app.icon),
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                contentScale = ContentScale.Fit
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(app.appName, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                Text(
+                    app.packageName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+            OutlinedButton(onClick = { onDisable(app.packageName) }) {
+                Text("Disable")
+            }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = { onUninstall(app.packageName) }) {
+                Text("Uninstall")
+            }
+        }
+    }
+}
+
+private suspend fun loadApps(pm: PackageManager): List<AppMetadata> =
+    withContext(Dispatchers.Default) {
+        pm.getInstalledPackages(PackageManager.MATCH_ALL)
+            .asSequence()
+            .mapNotNull { pkg ->
+                val app = pkg.applicationInfo ?: return@mapNotNull null
+                AppMetadata(
+                    packageName = pkg.packageName,
+                    appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
+                    icon = runCatching { app.loadIcon(pm) }.getOrNull(),
+                    isSystem = app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
+                            app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
+                )
+            }
+            .sortedBy { it.appName.lowercase() }
+            .toList()
+    }
