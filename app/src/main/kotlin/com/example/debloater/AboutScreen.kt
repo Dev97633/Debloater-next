@@ -48,7 +48,10 @@ fun AboutScreen() {
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(48.dp))
-        Text(stringResource(R.string.about_developed_by), style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = stringResource(R.string.about_developed_by),
+            style = MaterialTheme.typography.titleMedium
+        )
         Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.about_developer_name),
@@ -57,12 +60,16 @@ fun AboutScreen() {
         )
         Spacer(Modifier.height(40.dp))
 
+        // Device Information Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(stringResource(R.string.about_device_info), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = stringResource(R.string.about_device_info),
+                    style = MaterialTheme.typography.titleMedium
+                )
                 Spacer(Modifier.height(12.dp))
 
                 DeviceInfoRow("Model", "${Build.MANUFACTURER} ${Build.MODEL}")
@@ -75,7 +82,10 @@ fun AboutScreen() {
         }
 
         Spacer(Modifier.height(32.dp))
-        Text(stringResource(R.string.about_source_code), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = stringResource(R.string.about_source_code),
+            style = MaterialTheme.typography.bodyMedium
+        )
         Spacer(Modifier.height(8.dp))
         Text(
             text = githubUrl,
@@ -86,9 +96,16 @@ fun AboutScreen() {
             }
         )
         Spacer(Modifier.height(24.dp))
-        Text(stringResource(R.string.about_license), style = MaterialTheme.typography.bodySmall)
+        Text(
+            text = stringResource(R.string.about_license),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.about_shizuku_credit), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = stringResource(R.string.about_shizuku_credit),
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 
