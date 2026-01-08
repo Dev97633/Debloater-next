@@ -3,14 +3,13 @@
 package com.example.debloater
 
 import android.content.pm.PackageManager
-import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.activity.OnBackPressedCallback
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -77,28 +76,27 @@ fun DebloaterTheme(
 }
 
 @Immutable
-data class AppMetadata(
+data class AppData(
     val packageName: String,
     val appName: String,
-    val icon: Drawable?,
     val isSystem: Boolean
 )
 
 @Composable
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
+    val activity = (LocalContext.current as ComponentActivity)
     val pm = context.packageManager
     val scope = rememberCoroutineScope()
-    var allApps by remember { mutableStateOf<List<AppMetadata>>(emptyList()) }
+    var allAppData by remember { mutableStateOf<List<AppData>>(emptyList()) }
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
-    var selectedApp by rememberSaveable<AppMetadata?>(null) { mutableStateOf(null) }
+    var selectedApp by rememberSaveable<AppData?>(null) { mutableStateOf(null) }
 
     // Handle system back button
-    val activity = (LocalContext.current as ComponentActivity)
     val backCallback = remember {
         object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -119,14 +117,15 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     }
 
     LaunchedEffect(Unit) {
-        allApps = loadApps(pm)
+        allAppData = loadAppData(pm)
     }
 
-    val filteredApps by remember {
+    val filteredAppData by remember {
         derivedStateOf {
-            if (query.isBlank()) allApps
-            else allApps.filter {
-                it.appName.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true)
+            if (query.isBlank()) allAppData
+            else allAppData.filter {
+                it.appName.contains(query, ignoreCase = true) ||
+                it.packageName.contains(query, ignoreCase = true)
             }
         }
     }
@@ -138,7 +137,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 active = active,
                 onQueryChange = { query = it },
                 onActiveChange = { active = it },
-                suggestions = filteredApps.take(10),
+                suggestions = filteredAppData.take(10),
                 onSuggestionClick = { query = it; active = false },
                 currentScreen = currentScreen,
                 onNavigate = { currentScreen = it },
@@ -165,7 +164,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                         onRefresh = {
                             scope.launch {
                                 isRefreshing = true
-                                allApps = loadApps(pm)
+                                allAppData = loadAppData(pm)
                                 isRefreshing = false
                             }
                         }
@@ -175,15 +174,15 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                             contentPadding = PaddingValues(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(filteredApps, key = { it.packageName }) { app ->
+                            items(filteredAppData, key = { it.packageName }) { appData ->
                                 AppCard(
-                                    app = app,
+                                    appData = appData,
                                     onClick = {
-                                        selectedApp = app
+                                        selectedApp = appData
                                         currentScreen = "details"
                                     },
-                                    onDisable = { ShizukuManager.disable(app.packageName) },
-                                    onUninstall = { confirmUninstall = app.packageName }
+                                    onDisable = { ShizukuManager.disable(appData.packageName) },
+                                    onUninstall = { confirmUninstall = appData.packageName }
                                 )
                             }
                         }
@@ -191,7 +190,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 }
                 "details" -> selectedApp?.let { app ->
                     AppDetailsScreen(
-                        app = app,
+                        appData = app,
                         onBack = {
                             currentScreen = "apps"
                             selectedApp = null
@@ -213,7 +212,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     TextButton(onClick = {
                         scope.launch {
                             ShizukuManager.uninstall(pkg)
-                            allApps = allApps.filter { it.packageName != pkg }
+                            allAppData = allAppData.filter { it.packageName != pkg }
                         }
                         confirmUninstall = null
                     }) { Text("Uninstall") }
@@ -242,7 +241,7 @@ fun DebloaterTopBar(
         TopAppBar(
             title = { Text(if (currentScreen == "about") "About" else "Debloater") },
             navigationIcon = {
-                if (currentScreen == "about") {
+                if (currentScreen != "apps") {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
