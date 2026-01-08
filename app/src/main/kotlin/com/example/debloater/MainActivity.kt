@@ -77,16 +77,16 @@ fun DebloaterTheme(
 }
 
 @Immutable
-data class AppData(
+data class AppMetadata(
     val packageName: String,
     val appName: String,
+    val icon: Drawable?,
     val isSystem: Boolean
 )
 
 @Composable
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
-    val activity = (LocalContext.current as ComponentActivity)
     val pm = context.packageManager
     val scope = rememberCoroutineScope()
     var allApps by remember { mutableStateOf<List<AppMetadata>>(emptyList()) }
@@ -96,6 +96,27 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
     var selectedApp by rememberSaveable<AppMetadata?>(null) { mutableStateOf(null) }
+
+    // Handle system back button
+    val activity = (LocalContext.current as ComponentActivity)
+    val backCallback = remember {
+        object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (currentScreen != "apps") {
+                    currentScreen = "apps"
+                    selectedApp = null
+                } else {
+                    isEnabled = false
+                    activity.onBackPressed()
+                }
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        activity.onBackPressedDispatcher.addCallback(backCallback)
+        onDispose { backCallback.remove() }
+    }
 
     LaunchedEffect(Unit) {
         allApps = loadApps(pm)
@@ -110,28 +131,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         }
     }
 
-    val backCallback = remember {
-        object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                when (currentScreen) {
-                    "apps" -> {
-                        isEnabled = false
-                        activity.onBackPressed()
-                    }
-                    "details", "about" -> {
-                        currentScreen = "apps"
-                        selectedApp = null
-                    }
-                }
-            }
-        }
-    }
-
-    DisposableEffect(Unit) {
-        activity.onBackPressedDispatcher.addCallback(backCallback)
-        onDispose { backCallback.remove() }
-    }
-
     Scaffold(
         topBar = {
             DebloaterTopBar(
@@ -140,10 +139,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 onQueryChange = { query = it },
                 onActiveChange = { active = it },
                 suggestions = filteredApps.take(10),
-                onSuggestionClick = {
-                    query = it
-                    active = false
-                },
+                onSuggestionClick = { query = it; active = false },
                 currentScreen = currentScreen,
                 onNavigate = { currentScreen = it },
                 onBack = {
