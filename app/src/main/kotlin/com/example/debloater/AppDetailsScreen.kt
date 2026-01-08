@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import coil.compose.rememberAsyncImagePainter
 
+
 @Composable
 fun AppDetailsScreen(
     appData: AppData,
