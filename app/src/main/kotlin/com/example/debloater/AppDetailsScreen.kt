@@ -1,6 +1,5 @@
 package com.example.debloater
 
-import android.content.pm.PackageManager
 import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -14,7 +13,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import coil.compose.rememberAsyncImagePainter
 
 @Composable
@@ -77,7 +79,7 @@ fun AppDetailsScreen(
                     )
                 } else {
                     Text(
-                        appData.appName.take(1).uppercase(),
+                        text = appData.appName.take(1).uppercase(),
                         style = MaterialTheme.typography.headlineLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -100,7 +102,7 @@ fun AppDetailsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(32.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -134,7 +136,10 @@ fun AppDetailsScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     if (isDisabling) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
                         Spacer(Modifier.width(8.dp))
                     }
                     Text("Disable")
@@ -150,7 +155,11 @@ fun AppDetailsScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     if (isUninstalling) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
                         Spacer(Modifier.width(8.dp))
                     }
                     Text("Uninstall")
