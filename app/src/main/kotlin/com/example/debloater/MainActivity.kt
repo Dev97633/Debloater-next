@@ -2,7 +2,6 @@
 
 package com.example.debloater
 
-import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Build
@@ -10,63 +9,33 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Info
-import coil.compose.AsyncImage
+import androidx.compose.material.icons.filled.*
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.runtime.Immutable
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.core.graphics.drawable.toBitmap
-import android.graphics.Bitmap
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.material3.CircularProgressIndicator
-
-
-
-// Add these data classes to better structure the app data
-@Immutable
-data class AppData(
-    val packageName: String,
-    val appName: String,
-    val isSystem: Boolean,
-    val iconResId: Int? = null
-)
-
-@Immutable
-data class AppMetadata(
-    val packageName: String,
-    val appName: String,
-    val icon: Drawable?,
-    val isSystem: Boolean
-)
+import androidx.compose.runtime.Immutable
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -106,6 +75,14 @@ fun DebloaterTheme(
     MaterialTheme(colorScheme = scheme, content = content)
 }
 
+@Immutable
+data class AppData(
+    val packageName: String,
+    val appName: String,
+    val isSystem: Boolean,
+    val iconResId: Int? = null
+)
+
 @Composable
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
@@ -139,11 +116,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 active = active,
                 onQueryChange = { query = it },
                 onActiveChange = { active = it },
-                suggestions = filteredAppData.take(10),  // Now using AppData
-                onSuggestionClick = {
-                    query = it
-                    active = false
-                },
+                suggestions = filteredAppData.take(10),
+                onSuggestionClick = { query = it; active = false },
                 currentScreen = currentScreen,
                 onNavigate = { currentScreen = it }
             )
@@ -153,10 +127,10 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         AnimatedContent(
             targetState = currentScreen,
             transitionSpec = {
-                (fadeIn(animationSpec = tween(300)) + slideIntoContainer(towards = AnimatedContentTransitionScope.SlideDirection.Left))
-                    .togetherWith(fadeOut(animationSpec = tween(300)) + slideOutOfContainer(towards = AnimatedContentTransitionScope.SlideDirection.Right))
+                (fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left))
+                    .togetherWith(fadeOut(tween(300)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right))
             },
-            label = "screen_animation"
+            label = "screen_transition"
         ) { screen ->
             when (screen) {
                 "apps" -> {
@@ -175,13 +149,13 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                             contentPadding = PaddingValues(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                         items(filteredAppData, key = { it.packageName }) { appData ->
-      AppCard(
-        appData = appData,
-        onDisable = { ShizukuManager.disable(appData.packageName) },
-        onUninstall = { confirmUninstall = appData.packageName }
-    )
-}
+                            items(filteredAppData, key = { it.packageName }) { appData ->
+                                AppCard(  // Now defined below
+                                    appData = appData,
+                                    onDisable = { ShizukuManager.disable(appData.packageName) },
+                                    onUninstall = { confirmUninstall = appData.packageName }
+                                )
+                            }
                         }
                     }
                 }
@@ -217,7 +191,7 @@ fun DebloaterTopBar(
     active: Boolean,
     onQueryChange: (String) -> Unit,
     onActiveChange: (Boolean) -> Unit,
-    suggestions: List<AppData>,  // Changed to AppData
+    suggestions: List<AppData>,
     onSuggestionClick: (String) -> Unit,
     currentScreen: String,
     onNavigate: (String) -> Unit
@@ -277,14 +251,10 @@ fun DebloaterTopBar(
                             headlineContent = { Text(appData.appName) },
                             supportingContent = { Text(appData.packageName) },
                             leadingContent = {
-                                // Fallback placeholder since iconResId is not used
                                 Box(
                                     modifier = Modifier
                                         .size(40.dp)
-                                        .background(
-                                            MaterialTheme.colorScheme.surfaceVariant,
-                                            CircleShape
-                                        ),
+                                        .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
@@ -305,9 +275,95 @@ fun DebloaterTopBar(
     }
 }
 
-// Load only basic app data without icons initially
+@Composable
+fun AppCard(
+    appData: AppData,
+    onDisable: (String) -> Unit,
+    onUninstall: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val pm = context.packageManager
+
+    val icon by remember(appData.packageName) {
+        derivedStateOf {
+            try {
+                val appInfo = pm.getApplicationInfo(appData.packageName, 0)
+                appInfo.loadIcon(pm)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (appData.isSystem) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (icon != null) {
+                    Image(
+                        painter = rememberAsyncImagePainter(icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            appData.appName.take(1).uppercase(),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.width(16.dp))
+
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = appData.appName,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = appData.packageName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            OutlinedButton(onClick = { onDisable(appData.packageName) }) {
+                Text("Disable")
+            }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = { onUninstall(appData.packageName) }) {
+                Text("Uninstall")
+            }
+        }
+    }
+}
+
 private suspend fun loadAppData(pm: PackageManager): List<AppData> =
-    withContext(Dispatchers.IO) { // Use IO dispatcher for heavy operations
+    withContext(Dispatchers.IO) {
         try {
             pm.getInstalledPackages(PackageManager.MATCH_ALL)
                 .asSequence()
@@ -315,11 +371,9 @@ private suspend fun loadAppData(pm: PackageManager): List<AppData> =
                     val app = pkg.applicationInfo ?: return@mapNotNull null
                     AppData(
                         packageName = pkg.packageName,
-                        appName = runCatching { app.loadLabel(pm).toString() }
-                            .getOrElse { pkg.packageName },
+                        appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
                         isSystem = app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
-                                app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
-                        iconResId = app.icon
+                                app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
                     )
                 }
                 .sortedBy { it.appName.lowercase() }
@@ -327,23 +381,4 @@ private suspend fun loadAppData(pm: PackageManager): List<AppData> =
         } catch (e: Exception) {
             emptyList()
         }
-    }
-
-// Keep the old loadApps function if needed elsewhere
-private suspend fun loadApps(pm: PackageManager): List<AppMetadata> =
-    withContext(Dispatchers.IO) {
-        pm.getInstalledPackages(PackageManager.MATCH_ALL)
-            .asSequence()
-            .mapNotNull { pkg ->
-                val app = pkg.applicationInfo ?: return@mapNotNull null
-                AppMetadata(
-                    packageName = pkg.packageName,
-                    appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
-                    icon = runCatching { app.loadIcon(pm) }.getOrNull(),
-                    isSystem = app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
-                            app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
-                )
-            }
-            .sortedBy { it.appName.lowercase() }
-            .toList()
     }
