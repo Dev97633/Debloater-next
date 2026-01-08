@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import kotlinx.coroutines.launch
@@ -286,78 +287,108 @@ fun DebloaterTopBar(
 // -------------------- ABOUT SCREEN --------------------
 @Composable
 fun AboutScreen() {
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Debloater",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = "Version 1.0",
-            style = MaterialTheme.typography.bodyLarge
-        )
-        Spacer(Modifier.height(32.dp))
-        Text(
-            text = "A fast, clean debloater for Android.\nNo root required — powered by Shizuku.",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(40.dp))
-        Text("Developed by", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "DEV",  
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.height(40.dp))
+        item {
+            Text(
+                text = "Debloater",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center
+            )
+        }
+        item {
+            Text(
+                text = "Version 1.0 • January 2026",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+        item {
+            Text(
+                text = "A fast, clean debloater for Android.\nNo root required — powered by Shizuku.",
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        item {
+            Spacer(Modifier.height(24.dp))
+            Text("Developed with ❤️ by", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Your Name",  // ← Change to your name
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
 
-        // Device Specs Section
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Device Information", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                DeviceSpecRow("Model", "${Build.MANUFACTURER} ${Build.MODEL}")
-                DeviceSpecRow("Device", Build.DEVICE)
-                DeviceSpecRow("Brand", Build.BRAND)
-                DeviceSpecRow("Android Version", Build.VERSION.RELEASE)
-                DeviceSpecRow("API Level", Build.VERSION.SDK_INT.toString())
-                DeviceSpecRow("Build ID", Build.ID)
-                DeviceSpecRow("Fingerprint", Build.FINGERPRINT.take(50) + "...")  
+        // Device Information Card — Responsive
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Device Information", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(12.dp))
+
+                    DeviceInfoRow("Model", "${Build.MANUFACTURER} ${Build.MODEL}")
+                    DeviceInfoRow("Device", Build.DEVICE)
+                    DeviceInfoRow("Brand", Build.BRAND)
+                    DeviceInfoRow("Android Version", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+                    DeviceInfoRow("Build ID", Build.ID)
+                    DeviceInfoRow("Architecture", System.getProperty("os.arch") ?: "Unknown")
+                }
             }
         }
-        Spacer(Modifier.height(32.dp))
-        Text("Source code:", style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "github.com/Dev97633/Debloater",  // ← CHANGE TO YOUR REPO
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.height(24.dp))
-        Text("MIT Licensed", style = MaterialTheme.typography.bodySmall)
-        Spacer(Modifier.height(8.dp))
-        Text("Thanks to Rikka for Shizuku ❤️", style = MaterialTheme.typography.bodyMedium)
+
+        item {
+            Spacer(Modifier.height(24.dp))
+            Text("Source code:", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "github.com/yourusername/Debloater",  // ← Your repo
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        item {
+            Spacer(Modifier.height(16.dp))
+            Text("Licensed under MIT", style = MaterialTheme.typography.bodySmall)
+            Text("Thanks to Rikka for Shizuku ❤️", style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 
 @Composable
-fun DeviceSpecRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+fun DeviceInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f)
+        )
     }
-    Spacer(Modifier.height(4.dp))
 }
 
 // -------------------- CARD --------------------
