@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import kotlinx.coroutines.CoroutineScope
@@ -122,6 +123,23 @@ object ShizukuManager {
         }
     }
 
+    // ✅ NEW: PUBLIC METHOD TO REQUEST PERMISSION FROM INTRO SCREEN
+    fun requestPermission(activity: ComponentActivity) {
+        if (Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            showMessage("Shizuku permission already granted")
+            attemptBind()
+            return
+        }
+
+        if (!Shizuku.pingBinder()) {
+            showMessage("Shizuku is not running", SnackbarDuration.Long)
+            return
+        }
+
+        // ✅ Request permission via Shizuku
+        Shizuku.requestPermission(REQUEST_CODE)
+    }
+
     fun uninstall(packageName: String) {
         if (!isBound || debloaterService == null) {
             showMessage("Shizuku not connected - retrying...")
@@ -151,23 +169,4 @@ object ShizukuManager {
             showMessage("Disable failed: ${e.message}", SnackbarDuration.Long)
         }
     }
-        // 🔹 Check if Shizuku permission is already granted
-    fun isPermissionGranted(): Boolean {
-        return Shizuku.checkSelfPermission() ==
-            android.content.pm.PackageManager.PERMISSION_GRANTED
-    }
-
-    // 🔹 Request Shizuku permission (ONLY after user taps Next)
-    fun requestPermission() {
-        if (!Shizuku.pingBinder()) {
-            showMessage("Shizuku is not running", SnackbarDuration.Long)
-            return
-        }
-
-        if (Shizuku.checkSelfPermission() !=
-            android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            Shizuku.requestPermission(REQUEST_CODE)
-        }
-    }
-    fun isConnected(): Boolean = isBound
 }
