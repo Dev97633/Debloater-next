@@ -38,6 +38,9 @@ import kotlinx.coroutines.withContext
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Immutable
+import com.example.debloater.ui.prepermission.PreShizukuIntroScreen
+import com.example.debloater.ui.prepermission.ShizukuIntroPreferences
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
