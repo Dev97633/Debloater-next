@@ -87,7 +87,11 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val activity = (LocalContext.current as ComponentActivity)
     val pm = context.packageManager
     val scope = rememberCoroutineScope()
-    var allAppData by remember { mutableStateOf<List<AppData>>(emptyList()) }
+    
+    // ✅ PRELOAD ALL APPS AT STARTUP
+    var appDataSnapshot by remember { mutableStateOf<List<AppData>?>(null) }
+    var isLoadingApps by remember { mutableStateOf(true) }
+    
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -114,14 +118,21 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         onDispose { backCallback.remove() }
     }
 
+    // ✅ Load ALL apps once, off main thread
     LaunchedEffect(Unit) {
-        allAppData = loadAppData(pm)
+        scope.launch(Dispatchers.Default) {
+            val data = loadAllAppData(pm)
+            appDataSnapshot = data
+            isLoadingApps = false
+        }
     }
 
+    // ✅ Filter from snapshot (never null after load)
     val filteredAppData by remember {
         derivedStateOf {
-            if (query.isBlank()) allAppData
-            else allAppData.filter {
+            val apps = appDataSnapshot ?: return@derivedStateOf emptyList()
+            if (query.isBlank()) apps
+            else apps.filter {
                 it.appName.contains(query, ignoreCase = true) ||
                 it.packageName.contains(query, ignoreCase = true)
             }
@@ -147,57 +158,76 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        AnimatedContent(
-            targetState = currentScreen,
-            transitionSpec = {
-                (fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left))
-                    .togetherWith(fadeOut(tween(300)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right))
-            },
-            label = "screen_transition"
-        ) { screen ->
-            when (screen) {
-                "apps" -> {
-                    PullToRefreshBox(
-                        isRefreshing = isRefreshing,
-                        onRefresh = {
-                            scope.launch {
-                                isRefreshing = true
-                                allAppData = loadAppData(pm)
-                                isRefreshing = false
-                            }
-                        },
-                        modifier = Modifier.padding(padding)
-                    ) {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(0.dp)
+        // ✅ Show full-screen loading indicator
+        if (isLoadingApps) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator()
+                    Text("Loading apps...", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        } else {
+            AnimatedContent(
+                targetState = currentScreen,
+                transitionSpec = {
+                    (fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left))
+                        .togetherWith(fadeOut(tween(300)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right))
+                },
+                label = "screen_transition"
+            ) { screen ->
+                when (screen) {
+                    "apps" -> {
+                        PullToRefreshBox(
+                            isRefreshing = isRefreshing,
+                            onRefresh = {
+                                scope.launch {
+                                    isRefreshing = true
+                                    appDataSnapshot = loadAllAppData(pm)
+                                    isRefreshing = false
+                                }
+                            },
+                            modifier = Modifier.padding(padding)
                         ) {
-                            items(filteredAppData, key = { it.packageName }) { appData ->
-                                AppListItem(
-                                    appData = appData,
-                                    onClick = {
-                                        selectedApp = appData
-                                        currentScreen = "details"
-                                    },
-                                    onDisable = { ShizukuManager.disable(appData.packageName) },
-                                    onUninstall = { confirmUninstall = appData.packageName }
-                                )
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(0.dp)
+                            ) {
+                                items(filteredAppData, key = { it.packageName }) { appData ->
+                                    AppListItem(
+                                        appData = appData,
+                                        pm = pm,
+                                        onClick = {
+                                            selectedApp = appData
+                                            currentScreen = "details"
+                                        },
+                                        onDisable = { ShizukuManager.disable(appData.packageName) },
+                                        onUninstall = { confirmUninstall = appData.packageName }
+                                    )
+                                }
                             }
                         }
                     }
+                    "details" -> selectedApp?.let { app ->
+                        AppDetailsScreen(
+                            appData = app,
+                            onBack = {
+                                currentScreen = "apps"
+                                selectedApp = null
+                            },
+                            onDisable = { ShizukuManager.disable(app.packageName) },
+                            onUninstall = { confirmUninstall = app.packageName }
+                        )
+                    } ?: Box(Modifier.fillMaxSize())
+                    "about" -> AboutScreen()
                 }
-                "details" -> selectedApp?.let { app ->
-                    AppDetailsScreen(
-                        appData = app,
-                        onBack = {
-                            currentScreen = "apps"
-                            selectedApp = null
-                        },
-                        onDisable = { ShizukuManager.disable(app.packageName) },
-                        onUninstall = { confirmUninstall = app.packageName }
-                    )
-                } ?: Box(Modifier.fillMaxSize())
-                "about" -> AboutScreen()
             }
         }
 
@@ -210,7 +240,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     TextButton(onClick = {
                         scope.launch {
                             ShizukuManager.uninstall(pkg)
-                            allAppData = allAppData.filter { it.packageName != pkg }
+                            appDataSnapshot = appDataSnapshot?.filter { it.packageName != pkg }
                         }
                         confirmUninstall = null
                     }) { Text("Uninstall") }
@@ -314,14 +344,12 @@ fun DebloaterTopBar(
 @Composable
 fun AppListItem(
     appData: AppData,
+    pm: PackageManager,
     onClick: () -> Unit,
     onDisable: (String) -> Unit,
     onUninstall: (String) -> Unit
 ) {
-    val context = LocalContext.current
-    val pm = context.packageManager
-
-    // ✅ Load icon once, cache it
+    // ✅ Load icon once per app (not during scroll)
     val icon by remember(appData.packageName) {
         derivedStateOf {
             try {
@@ -346,7 +374,7 @@ fun AppListItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ✅ Icon with fallback - minimal, fast rendering
+            // ✅ Icon container (fixed size, never wraps)
             Box(
                 modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center
@@ -374,9 +402,11 @@ fun AppListItem(
                 }
             }
 
-            // ✅ App info - text only, no clickable wrapper
+            // ✅ App info container (flex, but constrained)
             Column(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .widthIn(max = 250.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
@@ -386,34 +416,44 @@ fun AppListItem(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                // ✅ Package name + System badge in ONE row (never wraps)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = appData.packageName,
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     if (appData.isSystem) {
                         Text(
                             text = "•",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.wrapContentWidth()
                         )
                         Text(
                             text = "System",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary
+                            color = MaterialTheme.colorScheme.tertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip,
+                            modifier = Modifier.wrapContentWidth()
                         )
                     }
                 }
             }
 
-            // ✅ Compact action buttons
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // ✅ Action buttons (fixed size, never wrap)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.wrapContentWidth()
+            ) {
                 IconButton(
                     onClick = { onDisable(appData.packageName) },
                     modifier = Modifier.size(36.dp)
@@ -439,7 +479,7 @@ fun AppListItem(
             }
         }
 
-        // ✅ Subtle divider
+        // ✅ Divider (subtle, no space waste)
         Divider(
             modifier = Modifier
                 .fillMaxWidth()
@@ -450,8 +490,9 @@ fun AppListItem(
     }
 }
 
-private suspend fun loadAppData(pm: PackageManager): List<AppData> =
-    withContext(Dispatchers.IO) {
+// ✅ PRELOAD ALL APPS AT ONCE
+private suspend fun loadAllAppData(pm: PackageManager): List<AppData> =
+    withContext(Dispatchers.Default) {
         try {
             pm.getInstalledPackages(PackageManager.MATCH_ALL)
                 .asSequence()
