@@ -169,5 +169,5 @@ object ShizukuManager {
             Shizuku.requestPermission(REQUEST_CODE)
         }
     }
-
+    fun isConnected(): Boolean = isBound
 }
