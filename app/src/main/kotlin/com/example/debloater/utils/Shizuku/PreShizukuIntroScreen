@@ -13,19 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-/**
- * ✅ Pre-Shizuku Introduction Screen
- *
- * Appears BEFORE any Shizuku permission dialog.
- * Explains why Shizuku is required and waits for explicit user action.
- */
 @Composable
 fun PreShizukuIntroScreen(
     onNextClick: () -> Unit
 ) {
-    Scaffold(
-        modifier = Modifier.fillMaxSize()
-    ) { padding ->
+    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -35,7 +27,7 @@ fun PreShizukuIntroScreen(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
 
-            /* ───────────── Header ───────────── */
+            /* ───────── Header ───────── */
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -57,7 +49,7 @@ fun PreShizukuIntroScreen(
                 )
             }
 
-            /* ───────────── Content ───────────── */
+            /* ───────── Content ───────── */
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -75,7 +67,7 @@ fun PreShizukuIntroScreen(
                     """.trimIndent()
                 )
 
-                Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                Divider()
 
                 Section(
                     title = "How to set up",
@@ -87,7 +79,7 @@ fun PreShizukuIntroScreen(
                     """.trimIndent()
                 )
 
-                Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                Divider()
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -103,7 +95,7 @@ fun PreShizukuIntroScreen(
                 }
             }
 
-            /* ───────────── Action ───────────── */
+            /* ───────── Action ───────── */
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -131,18 +123,10 @@ fun PreShizukuIntroScreen(
     }
 }
 
-/* ───────────────────────────────────────── */
-
 @Composable
-private fun Section(
-    title: String,
-    body: String
-) {
+private fun Section(title: String, body: String) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium
-        )
+        Text(text = title, style = MaterialTheme.typography.titleMedium)
         Text(
             text = body,
             style = MaterialTheme.typography.bodyMedium,
@@ -151,7 +135,7 @@ private fun Section(
     }
 }
 
-/* ───────────── Intro State Helper ───────────── */
+/* ───────── Intro State Helper ───────── */
 
 object ShizukuIntroPreferences {
 
