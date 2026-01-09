@@ -151,4 +151,23 @@ object ShizukuManager {
             showMessage("Disable failed: ${e.message}", SnackbarDuration.Long)
         }
     }
+        // 🔹 Check if Shizuku permission is already granted
+    fun isPermissionGranted(): Boolean {
+        return Shizuku.checkSelfPermission() ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
+    // 🔹 Request Shizuku permission (ONLY after user taps Next)
+    fun requestPermission() {
+        if (!Shizuku.pingBinder()) {
+            showMessage("Shizuku is not running", SnackbarDuration.Long)
+            return
+        }
+
+        if (Shizuku.checkSelfPermission() !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Shizuku.requestPermission(REQUEST_CODE)
+        }
+    }
+
 }
