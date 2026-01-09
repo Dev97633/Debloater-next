@@ -1,5 +1,6 @@
 package com.example.debloater
 
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -180,24 +181,24 @@ object ShizukuIntroPreferences {
     /**
      * Check if intro screen has been shown before
      */
-    fun hasIntroBeenShown(context: android.content.Context): Boolean {
-        val prefs = context.getSharedPreferences(PREF_NAME, android.content.Context.MODE_PRIVATE)
+    fun hasIntroBeenShown(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         return prefs.getBoolean(KEY_INTRO_SHOWN, false)
     }
 
     /**
      * Mark intro screen as shown
      */
-    fun markIntroAsShown(context: android.content.Context) {
-        val prefs = context.getSharedPreferences(PREF_NAME, android.content.Context.MODE_PRIVATE)
+    fun markIntroAsShown(context: Context) {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         prefs.edit().putBoolean(KEY_INTRO_SHOWN, true).apply()
     }
 
     /**
      * Reset intro (for testing or user preference)
      */
-    fun resetIntro(context: android.content.Context) {
-        val prefs = context.getSharedPreferences(PREF_NAME, android.content.Context.MODE_PRIVATE)
+    fun resetIntro(context: Context) {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         prefs.edit().putBoolean(KEY_INTRO_SHOWN, false).apply()
     }
 }
