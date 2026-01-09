@@ -43,36 +43,40 @@ import androidx.compose.runtime.Immutable
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         ShizukuManager.init(this)
-      setContent {
-    DebloaterTheme {
-        val context = LocalContext.current
-        val snackbarHostState = remember { SnackbarHostState() }
 
-        LaunchedEffect(Unit) {
-            ShizukuManager.setSnackbarHostState(snackbarHostState)
-        }
+        setContent {
+            DebloaterTheme {
+                val context = LocalContext.current
+                val snackbarHostState = remember { SnackbarHostState() }
 
-        val showIntro = remember {
-            mutableStateOf(
-                !ShizukuManager.hasShizukuPermission() &&
-                !ShizukuIntroPreferences.hasIntroBeenShown(context)
-            )
-        }
-
-        if (showIntro.value) {
-            ShizukuIntroScreen(
-                onNextClick = {
-                    ShizukuIntroPreferences.markIntroAsShown(context)
-                    ShizukuManager.requestShizukuPermission()
-                    showIntro.value = false
+                LaunchedEffect(Unit) {
+                    ShizukuManager.setSnackbarHostState(snackbarHostState)
                 }
-            )
-        } else {
-            DebloaterScreen(snackbarHostState)
+
+                // ✅ CORRECT intro condition
+                val showIntro = remember {
+                    mutableStateOf(
+                        !ShizukuManager.isPermissionGranted() &&
+                        !ShizukuIntroPreferences.hasBeenShown(context)
+                    )
+                }
+
+                if (showIntro.value) {
+                    // ✅ CORRECT composable + functions
+                    PreShizukuIntroScreen(
+                        onNextClick = {
+                            ShizukuIntroPreferences.markAsShown(context)
+                            ShizukuManager.requestPermission()
+                            showIntro.value = false
+                        }
+                    )
+                } else {
+                    DebloaterScreen(snackbarHostState)
+                }
+            }
         }
-    }
-}
     }
 
     override fun onDestroy() {
