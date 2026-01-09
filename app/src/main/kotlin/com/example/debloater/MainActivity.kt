@@ -22,7 +22,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -96,8 +95,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
     var selectedApp by remember { mutableStateOf<AppData?>(null) }
 
-
-    // Handle system back button
     val backCallback = remember {
         object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -168,15 +165,15 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                 allAppData = loadAppData(pm)
                                 isRefreshing = false
                             }
-                        }
+                        },
+                        modifier = Modifier.padding(padding)
                     ) {
                         LazyColumn(
-                            modifier = Modifier.padding(padding),
-                            contentPadding = PaddingValues(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(0.dp)
                         ) {
                             items(filteredAppData, key = { it.packageName }) { appData ->
-                                AppCard(
+                                AppListItem(
                                     appData = appData,
                                     onClick = {
                                         selectedApp = appData
@@ -254,10 +251,7 @@ fun DebloaterTopBar(
             navigationIcon = {
                 if (showBack) {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
             },
@@ -270,7 +264,6 @@ fun DebloaterTopBar(
             }
         )
 
-        // 🔍 Search ONLY on apps screen
         if (currentScreen == "apps") {
             SearchBar(
                 query = query,
@@ -319,7 +312,7 @@ fun DebloaterTopBar(
 }
 
 @Composable
-fun AppCard(
+fun AppListItem(
     appData: AppData,
     onClick: () -> Unit,
     onDisable: (String) -> Unit,
@@ -328,6 +321,7 @@ fun AppCard(
     val context = LocalContext.current
     val pm = context.packageManager
 
+    // ✅ Load icon once, cache it
     val icon by remember(appData.packageName) {
         derivedStateOf {
             try {
@@ -339,75 +333,120 @@ fun AppCard(
         }
     }
 
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (appData.isSystem) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
-        ),
-        modifier = Modifier.clickable(onClick = onClick)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surface
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ✅ Icon with fallback - minimal, fast rendering
             Box(
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center
             ) {
                 if (icon != null) {
                     Image(
                         painter = rememberAsyncImagePainter(icon),
                         contentDescription = null,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(40.dp),
                         contentScale = ContentScale.Fit
                     )
                 } else {
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                            .size(40.dp)
+                            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             appData.appName.take(1).uppercase(),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.width(16.dp))
-
+            // ✅ App info - text only, no clickable wrapper
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable(onClick = onClick)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = appData.appName,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = appData.packageName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = appData.packageName,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (appData.isSystem) {
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                        Text(
+                            text = "System",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                }
             }
 
-            OutlinedButton(onClick = { onDisable(appData.packageName) }) {
-                Text("Disable")
-            }
-            Spacer(Modifier.width(8.dp))
-            Button(onClick = { onUninstall(appData.packageName) }) {
-                Text("Uninstall")
+            // ✅ Compact action buttons
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                IconButton(
+                    onClick = { onDisable(appData.packageName) },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Block,
+                        contentDescription = "Disable",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                IconButton(
+                    onClick = { onUninstall(appData.packageName) },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Uninstall",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
+
+        // ✅ Subtle divider
+        Divider(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 68.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+            thickness = 0.5.dp
+        )
     }
 }
 
