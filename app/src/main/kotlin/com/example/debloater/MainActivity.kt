@@ -38,15 +38,13 @@ import kotlinx.coroutines.withContext
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Immutable
-import com.example.debloater.ui.prepermission.PreShizukuIntroScreen
-import com.example.debloater.ui.prepermission.ShizukuIntroPreferences
 
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ShizukuManager.init(this)
-        setContent {
+      setContent {
     DebloaterTheme {
         val context = LocalContext.current
         val snackbarHostState = remember { SnackbarHostState() }
@@ -55,24 +53,19 @@ class MainActivity : ComponentActivity() {
             ShizukuManager.setSnackbarHostState(snackbarHostState)
         }
 
-        var showIntro by remember {
+        val showIntro = remember {
             mutableStateOf(
-                !ShizukuManager.hasPermission() &&
-                !ShizukuIntroPreferences.hasBeenShown(context)
+                !ShizukuManager.isPermissionGranted() &&
+                !ShizukuIntroPreferences.hasIntroBeenShown(context)
             )
         }
 
-        if (showIntro) {
-            PreShizukuIntroScreen(
+        if (showIntro.value) {
+            ShizukuIntroScreen(
                 onNextClick = {
-                    // Mark intro as completed
-                    ShizukuIntroPreferences.markAsShown(context)
-
-                    // Request permission ONLY after user action
-                    ShizukuManager.requestPermissionIfNeeded()
-
-                    // Proceed to main UI
-                    showIntro = false
+                    ShizukuIntroPreferences.markIntroAsShown(context)
+                    ShizukuManager.requestPermission()
+                    showIntro.value = false
                 }
             )
         } else {
@@ -80,7 +73,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
     }
 
     override fun onDestroy() {
