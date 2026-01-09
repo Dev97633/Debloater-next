@@ -44,14 +44,40 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         ShizukuManager.init(this)
         setContent {
-            DebloaterTheme {
-                val snackbarHostState = remember { SnackbarHostState() }
-                LaunchedEffect(Unit) {
-                    ShizukuManager.setSnackbarHostState(snackbarHostState)
-                }
-                DebloaterScreen(snackbarHostState)
-            }
+    DebloaterTheme {
+        val context = LocalContext.current
+        val snackbarHostState = remember { SnackbarHostState() }
+
+        LaunchedEffect(Unit) {
+            ShizukuManager.setSnackbarHostState(snackbarHostState)
         }
+
+        var showIntro by remember {
+            mutableStateOf(
+                !ShizukuManager.hasPermission() &&
+                !ShizukuIntroPreferences.hasBeenShown(context)
+            )
+        }
+
+        if (showIntro) {
+            PreShizukuIntroScreen(
+                onNextClick = {
+                    // Mark intro as completed
+                    ShizukuIntroPreferences.markAsShown(context)
+
+                    // Request permission ONLY after user action
+                    ShizukuManager.requestPermissionIfNeeded()
+
+                    // Proceed to main UI
+                    showIntro = false
+                }
+            )
+        } else {
+            DebloaterScreen(snackbarHostState)
+        }
+    }
+}
+
     }
 
     override fun onDestroy() {
