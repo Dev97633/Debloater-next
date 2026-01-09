@@ -3,6 +3,7 @@
 package com.example.debloater
 
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -10,11 +11,13 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -40,38 +43,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ShizukuManager.init(this)
-        
         setContent {
             DebloaterTheme {
                 val snackbarHostState = remember { SnackbarHostState() }
                 LaunchedEffect(Unit) {
                     ShizukuManager.setSnackbarHostState(snackbarHostState)
                 }
-                
-                // ✅ NEW: Check if intro should be shown
-                val context = LocalContext.current
-                var showIntro by remember { 
-                    mutableStateOf(
-                        !ShizukuIntroPreferences.hasIntroBeenShown(context)
-                    )
-                }
-                
-                if (showIntro) {
-                    // ✅ Show intro screen
-                    ShizukuIntroScreen(
-                        onNextClick = {
-                            // Mark intro as shown
-                            ShizukuIntroPreferences.markIntroAsShown(context)
-                            showIntro = false
-                            
-                            // Trigger Shizuku permission request
-                            ShizukuManager.requestPermission(this@MainActivity)
-                        }
-                    )
-                } else {
-                    // ✅ Show normal app
-                    DebloaterScreen(snackbarHostState)
-                }
+                DebloaterScreen(snackbarHostState)
             }
         }
     }
@@ -103,7 +81,8 @@ fun DebloaterTheme(
 data class AppData(
     val packageName: String,
     val appName: String,
-    val isSystem: Boolean
+    val isSystem: Boolean,
+    val icon: Drawable? = null  // ✅ PRE-CACHED ICON
 )
 
 @Composable
@@ -113,7 +92,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val pm = context.packageManager
     val scope = rememberCoroutineScope()
     
-    // ✅ PRELOAD ALL APPS AT STARTUP
+    // ✅ PRELOAD ALL APPS WITH ICONS AT STARTUP
     var appDataSnapshot by remember { mutableStateOf<List<AppData>?>(null) }
     var isLoadingApps by remember { mutableStateOf(true) }
     
@@ -143,10 +122,10 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         onDispose { backCallback.remove() }
     }
 
-    // ✅ Load ALL apps once, off main thread
+    // ✅ LOAD ALL APPS WITH ICONS AT ONCE
     LaunchedEffect(Unit) {
         scope.launch(Dispatchers.Default) {
-            val data = loadAllAppData(pm)
+            val data = loadAllAppDataWithIcons(pm)
             appDataSnapshot = data
             isLoadingApps = false
         }
@@ -195,7 +174,9 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp)
+                    )
                     Text("Loading apps...", style = MaterialTheme.typography.bodyMedium)
                 }
             }
@@ -215,20 +196,22 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                             onRefresh = {
                                 scope.launch {
                                     isRefreshing = true
-                                    appDataSnapshot = loadAllAppData(pm)
+                                    appDataSnapshot = loadAllAppDataWithIcons(pm)
                                     isRefreshing = false
                                 }
                             },
                             modifier = Modifier.padding(padding)
                         ) {
+                            // ✅ SMOOTH GESTURE-CONTROLLED SCROLLING
                             LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(0.dp)
+                                modifier = Modifier
+                                    .fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(0.dp),
+                                flingBehavior = androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
                             ) {
                                 items(filteredAppData, key = { it.packageName }) { appData ->
                                     AppListItem(
                                         appData = appData,
-                                        pm = pm,
                                         onClick = {
                                             selectedApp = appData
                                             currentScreen = "details"
@@ -369,23 +352,10 @@ fun DebloaterTopBar(
 @Composable
 fun AppListItem(
     appData: AppData,
-    pm: PackageManager,
     onClick: () -> Unit,
     onDisable: (String) -> Unit,
     onUninstall: (String) -> Unit
 ) {
-    // ✅ Load icon once per app (not during scroll)
-    val icon by remember(appData.packageName) {
-        derivedStateOf {
-            try {
-                val appInfo = pm.getApplicationInfo(appData.packageName, 0)
-                appInfo.loadIcon(pm)
-            } catch (e: Exception) {
-                null
-            }
-        }
-    }
-
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -399,14 +369,14 @@ fun AppListItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ✅ Icon container (fixed size, never wraps)
+            // ✅ ICON ALREADY CACHED - NO LOADING DURING SCROLL
             Box(
                 modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (icon != null) {
+                if (appData.icon != null) {
                     Image(
-                        painter = rememberAsyncImagePainter(icon),
+                        painter = rememberAsyncImagePainter(appData.icon),
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
                         contentScale = ContentScale.Fit
@@ -515,19 +485,27 @@ fun AppListItem(
     }
 }
 
-// ✅ PRELOAD ALL APPS AT ONCE
-private suspend fun loadAllAppData(pm: PackageManager): List<AppData> =
+// ✅ PRELOAD ALL APPS WITH ICONS AT ONCE - OFF MAIN THREAD
+private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
     withContext(Dispatchers.Default) {
         try {
             pm.getInstalledPackages(PackageManager.MATCH_ALL)
                 .asSequence()
                 .mapNotNull { pkg ->
                     val app = pkg.applicationInfo ?: return@mapNotNull null
+                    // ✅ LOAD ICON HERE, NOT DURING SCROLL
+                    val icon = try {
+                        app.loadIcon(pm)
+                    } catch (e: Exception) {
+                        null
+                    }
+                    
                     AppData(
                         packageName = pkg.packageName,
                         appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
                         isSystem = app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
-                                app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
+                                app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
+                        icon = icon  // ✅ CACHED HERE
                     )
                 }
                 .sortedBy { it.appName.lowercase() }
