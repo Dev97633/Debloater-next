@@ -9,7 +9,7 @@
     <string name="about_developer_name">DEV</string>
     <string name="about_device_info">Device Information</string>
     <string name="about_source_code">Source code on GitHub:</string>
-    <string name="about_github_url">https://github.com/Dev97633/Debloater</string>  <!-- CHANGE THIS -->
+    <string name="about_github_url">https://github.com/Dev97633/Debloater-next</string>  <!-- CHANGE THIS -->
     <string name="about_license">Licensed under MIT</string>
     <string name="about_shizuku_credit">Thanks to Rikka for Shizuku ❤️</string>
 </resources>
