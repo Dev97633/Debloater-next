@@ -40,13 +40,38 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ShizukuManager.init(this)
+        
         setContent {
             DebloaterTheme {
                 val snackbarHostState = remember { SnackbarHostState() }
                 LaunchedEffect(Unit) {
                     ShizukuManager.setSnackbarHostState(snackbarHostState)
                 }
-                DebloaterScreen(snackbarHostState)
+                
+                // ✅ NEW: Check if intro should be shown
+                val context = LocalContext.current
+                var showIntro by remember { 
+                    mutableStateOf(
+                        !ShizukuIntroPreferences.hasIntroBeenShown(context)
+                    )
+                }
+                
+                if (showIntro) {
+                    // ✅ Show intro screen
+                    ShizukuIntroScreen(
+                        onNextClick = {
+                            // Mark intro as shown
+                            ShizukuIntroPreferences.markIntroAsShown(context)
+                            showIntro = false
+                            
+                            // Trigger Shizuku permission request
+                            ShizukuManager.requestPermission(this@MainActivity)
+                        }
+                    )
+                } else {
+                    // ✅ Show normal app
+                    DebloaterScreen(snackbarHostState)
+                }
             }
         }
     }
