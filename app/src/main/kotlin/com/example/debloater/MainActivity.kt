@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
 
         val showIntro = remember {
             mutableStateOf(
-                !ShizukuManager.isPermissionGranted() &&
+                !ShizukuManager.hasShizukuPermission() &&
                 !ShizukuIntroPreferences.hasIntroBeenShown(context)
             )
         }
@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
             ShizukuIntroScreen(
                 onNextClick = {
                     ShizukuIntroPreferences.markIntroAsShown(context)
-                    ShizukuManager.requestPermission()
+                    ShizukuManager.requestShizukuPermission()
                     showIntro.value = false
                 }
             )
