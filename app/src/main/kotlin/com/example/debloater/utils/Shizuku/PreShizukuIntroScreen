@@ -1,0 +1,171 @@
+package com.example.debloater.ui.prepermission
+
+import android.content.Context
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+
+/**
+ * ✅ Pre-Shizuku Introduction Screen
+ *
+ * Appears BEFORE any Shizuku permission dialog.
+ * Explains why Shizuku is required and waits for explicit user action.
+ */
+@Composable
+fun PreShizukuIntroScreen(
+    onNextClick: () -> Unit
+) {
+    Scaffold(
+        modifier = Modifier.fillMaxSize()
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+
+            /* ───────────── Header ───────────── */
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Security,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+
+                Text(
+                    text = "Debloater Requires Shizuku",
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            /* ───────────── Content ───────────── */
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+
+                Section(
+                    title = "What is Shizuku?",
+                    body = """
+                        Shizuku is a system-level service that allows Debloater to:
+                        • Disable system apps
+                        • Uninstall pre-installed apps
+                        • Perform privileged operations safely
+                    """.trimIndent()
+                )
+
+                Divider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                Section(
+                    title = "How to set up",
+                    body = """
+                        1. Tap “Next” below
+                        2. Grant permission in the Shizuku app
+                        3. Return to Debloater
+                        4. Start managing apps
+                    """.trimIndent()
+                )
+
+                Divider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "🔒 Privacy & Security",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Debloater only accesses system APIs you explicitly authorize through Shizuku. No data is collected or transmitted.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            /* ───────────── Action ───────────── */
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = onNextClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text("Next: Request Shizuku Permission")
+                }
+
+                Text(
+                    text = "This screen will be skipped next time",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+/* ───────────────────────────────────────── */
+
+@Composable
+private fun Section(
+    title: String,
+    body: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium
+        )
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/* ───────────── Intro State Helper ───────────── */
+
+object ShizukuIntroPreferences {
+
+    private const val PREF_NAME = "pre_shizuku_intro"
+    private const val KEY_SHOWN = "shown"
+
+    fun hasBeenShown(context: Context): Boolean =
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_SHOWN, false)
+
+    fun markAsShown(context: Context) {
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_SHOWN, true)
+            .apply()
+    }
+}
