@@ -3,6 +3,7 @@
 package com.example.debloater
 
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -105,7 +106,7 @@ data class AppData(
     val packageName: String,
     val appName: String,
     val isSystem: Boolean,
-    val icon: android.graphics.drawable.Drawable? = null
+    val icon: Drawable? = null
 )
 
 @Composable
