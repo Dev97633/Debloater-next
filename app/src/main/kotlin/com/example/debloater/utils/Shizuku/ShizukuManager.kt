@@ -122,6 +122,25 @@ object ShizukuManager {
         }
     }
 
+    // ✅ NEW: Public method called when user taps "Next" in Shizuku info dialog
+    fun requestShizukuPermission() {
+        if (isBound) {
+            showMessage("Shizuku already connected!", SnackbarDuration.Short)
+            return
+        }
+
+        if (!Shizuku.pingBinder()) {
+            showMessage("Shizuku is not running. Please install and start Shizuku.", SnackbarDuration.Long)
+            return
+        }
+
+        if (Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Shizuku.requestPermission(REQUEST_CODE)
+        } else {
+            attemptBind()
+        }
+    }
+
     fun uninstall(packageName: String) {
         if (!isBound || debloaterService == null) {
             showMessage("Shizuku not connected - retrying...")
