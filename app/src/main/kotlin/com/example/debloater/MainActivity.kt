@@ -42,12 +42,13 @@ import androidx.compose.runtime.Immutable
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ShizukuManager.init(this)
         setContent {
             DebloaterTheme {
                 val snackbarHostState = remember { SnackbarHostState() }
                 LaunchedEffect(Unit) {
                     ShizukuManager.setSnackbarHostState(snackbarHostState)
+                    // Initialize Shizuku after setting snackbar state
+                    ShizukuManager.init(this@MainActivity)
                 }
                 DebloaterScreen(snackbarHostState)
             }
@@ -82,7 +83,7 @@ data class AppData(
     val packageName: String,
     val appName: String,
     val isSystem: Boolean,
-    val icon: Drawable? = null  // ✅ PRE-CACHED ICON
+    val icon: Drawable? = null
 )
 
 @Composable
@@ -92,7 +93,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val pm = context.packageManager
     val scope = rememberCoroutineScope()
     
-    // ✅ PRELOAD ALL APPS WITH ICONS AT STARTUP
     var appDataSnapshot by remember { mutableStateOf<List<AppData>?>(null) }
     var isLoadingApps by remember { mutableStateOf(true) }
     
@@ -102,6 +102,9 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
     var selectedApp by remember { mutableStateOf<AppData?>(null) }
+    
+    // ✅ NEW: Track if Shizuku info dialog has been shown
+    var showShizukuInfoDialog by rememberSaveable { mutableStateOf(true) }
 
     val backCallback = remember {
         object : OnBackPressedCallback(true) {
@@ -122,7 +125,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         onDispose { backCallback.remove() }
     }
 
-    // ✅ LOAD ALL APPS WITH ICONS AT ONCE
     LaunchedEffect(Unit) {
         scope.launch(Dispatchers.Default) {
             val data = loadAllAppDataWithIcons(pm)
@@ -131,7 +133,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         }
     }
 
-    // ✅ Filter from snapshot (never null after load)
     val filteredAppData by remember {
         derivedStateOf {
             val apps = appDataSnapshot ?: return@derivedStateOf emptyList()
@@ -162,7 +163,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        // ✅ Show full-screen loading indicator
         if (isLoadingApps) {
             Box(
                 modifier = Modifier
@@ -202,7 +202,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                             },
                             modifier = Modifier.padding(padding)
                         ) {
-                            // ✅ SMOOTH GESTURE-CONTROLLED SCROLLING
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxSize(),
@@ -258,7 +257,59 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 }
             )
         }
+
+        // ✅ NEW: Shizuku Info Dialog
+        if (showShizukuInfoDialog) {
+            ShizukuInfoDialog(
+                onDismiss = {
+                    showShizukuInfoDialog = false
+                    // Trigger Shizuku prompt after user taps Next
+                    ShizukuManager.requestShizukuPermission()
+                }
+            )
+        }
     }
+}
+
+// ✅ NEW: Shizuku Information Dialog
+@Composable
+fun ShizukuInfoDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        title = {
+            Text("Shizuku Required")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Shizuku is necessary to use this app.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    "Shizuku provides the elevated permissions required to disable and uninstall system apps safely.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Make sure Shizuku is installed and running on your device.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onDismiss() }) {
+                Text("Next")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onDismiss() }) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -369,7 +420,6 @@ fun AppListItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ✅ ICON ALREADY CACHED - NO LOADING DURING SCROLL
             Box(
                 modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center
@@ -397,7 +447,6 @@ fun AppListItem(
                 }
             }
 
-            // ✅ App info container (flex, but constrained)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -411,7 +460,6 @@ fun AppListItem(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                // ✅ Package name + System badge in ONE row (never wraps)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -444,7 +492,6 @@ fun AppListItem(
                 }
             }
 
-            // ✅ Action buttons (fixed size, never wrap)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.wrapContentWidth()
@@ -474,7 +521,6 @@ fun AppListItem(
             }
         }
 
-        // ✅ Divider (subtle, no space waste)
         Divider(
             modifier = Modifier
                 .fillMaxWidth()
@@ -485,7 +531,6 @@ fun AppListItem(
     }
 }
 
-// ✅ PRELOAD ALL APPS WITH ICONS AT ONCE - OFF MAIN THREAD
 private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
     withContext(Dispatchers.Default) {
         try {
@@ -493,7 +538,6 @@ private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
                 .asSequence()
                 .mapNotNull { pkg ->
                     val app = pkg.applicationInfo ?: return@mapNotNull null
-                    // ✅ LOAD ICON HERE, NOT DURING SCROLL
                     val icon = try {
                         app.loadIcon(pm)
                     } catch (e: Exception) {
@@ -505,7 +549,7 @@ private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
                         appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
                         isSystem = app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
                                 app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
-                        icon = icon  // ✅ CACHED HERE
+                        icon = icon
                     )
                 }
                 .sortedBy { it.appName.lowercase() }
