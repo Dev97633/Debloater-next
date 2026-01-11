@@ -11,7 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -29,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -148,11 +150,9 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
 
     when (currentScreen) {
         "onboarding" -> OnboardingScreen {
-            // Mark as not first launch
             prefs.edit().putBoolean(KEY_FIRST_LAUNCH, false).apply()
             isFirstLaunch = false
             currentScreen = "apps"
-            // Shizuku prompt will be triggered by your existing logic
         }
         else -> {
             Scaffold(
@@ -252,17 +252,17 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     }
 }
 
-// New Onboarding Screen
 @Composable
 fun OnboardingScreen(onNext: () -> Unit) {
-    val infiniteTransition = rememberInfiniteTransition()
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val alpha by infiniteTransition.animateFloat(
         initialValue = 0.4f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(1500),
             repeatMode = RepeatMode.Reverse
-        )
+        ),
+        label = "alpha"
     )
 
     Column(
@@ -273,7 +273,7 @@ fun OnboardingScreen(onNext: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Image(
-            painter = painterResource(R.drawable.ic_shizuku), // ← Add your Shizuku icon in res/drawable
+            painter = painterResource(R.drawable.ic_shizuku), // Add your Shizuku icon in res/drawable
             contentDescription = null,
             modifier = Modifier
                 .size(120.dp)
