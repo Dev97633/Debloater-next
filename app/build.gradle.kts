@@ -60,10 +60,12 @@ dependencies {
     implementation("androidx.compose.material:material")
     implementation("androidx.activity:activity-compose:1.9.0")
     implementation("androidx.compose.material:material-icons-extended")
+    
 
     // Coroutines for Snackbar
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
     implementation("io.coil-kt:coil-compose:2.7.0")  // Latest Coil for Compose (Jan 2026)
+    implementation("com.airbnb.android:lottie-compose:6.3.0")
 
     // Shizuku
     implementation("dev.rikka.shizuku:api:13.1.5")
