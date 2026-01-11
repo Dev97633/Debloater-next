@@ -88,7 +88,8 @@ object ShizukuManager {
         Shizuku.addBinderReceivedListener(binderReceivedListener)
         Shizuku.addBinderDeadListener(binderDeadListener)
 
-        attemptBind()
+        // ✅ Only setup listeners, don't attempt bind yet
+        // User will trigger binding via requestShizukuPermission() after dialog
     }
 
     fun cleanup() {
