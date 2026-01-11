@@ -12,4 +12,7 @@
     <string name="about_github_url">https://github.com/Dev97633/Debloater-next</string>  <!-- CHANGE THIS -->
     <string name="about_license">Licensed under MIT</string>
     <string name="about_shizuku_credit">Thanks to Rikka for Shizuku ❤️</string>
+    <string name="onboarding_title">Welcome to Debloater</string>
+    <string name="onboarding_message">Shizuku is necessary to use this app.\nIt allows safe, non-root access to disable/uninstall apps.</string>
+    <string name="onboarding_next">Next</string>
 </resources>
