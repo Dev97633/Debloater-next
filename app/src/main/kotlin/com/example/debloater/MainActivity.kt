@@ -42,7 +42,7 @@ import androidx.compose.runtime.Immutable
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ShizukuManager.init(this)
+        //ShizukuManager.init(this)
         setContent {
             DebloaterTheme {
                 val snackbarHostState = remember { SnackbarHostState() }
