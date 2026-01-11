@@ -43,6 +43,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         //ShizukuManager.init(this)
+        val prefs = getSharedPreferences("intro_prefs", MODE_PRIVATE)
+if (prefs.getBoolean("intro_done", false)) {
+    ShizukuManager.init(applicationContext)
+}
         setContent {
             DebloaterTheme {
                 val snackbarHostState = remember { SnackbarHostState() }
