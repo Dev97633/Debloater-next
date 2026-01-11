@@ -41,23 +41,19 @@ import androidx.compose.runtime.Immutable
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-
-    val prefs = getSharedPreferences("intro_prefs", MODE_PRIVATE)
-    if (prefs.getBoolean("intro_done", false)) {
-        ShizukuManager.init(applicationContext)   // ✅ MUST be first
-    }
-
-    setContent {
-        DebloaterTheme {
-            val snackbarHostState = remember { SnackbarHostState() }
-            LaunchedEffect(Unit) {
-                ShizukuManager.setSnackbarHostState(snackbarHostState)
+        super.onCreate(savedInstanceState)
+        ShizukuManager.init(this)
+        setContent {
+            DebloaterTheme {
+                val snackbarHostState = remember { SnackbarHostState() }
+                LaunchedEffect(Unit) {
+                    ShizukuManager.setSnackbarHostState(snackbarHostState)
+                }
+                DebloaterScreen(snackbarHostState)
             }
-            DebloaterScreen(snackbarHostState)
         }
     }
-}
+
     override fun onDestroy() {
         ShizukuManager.cleanup()
         super.onDestroy()
