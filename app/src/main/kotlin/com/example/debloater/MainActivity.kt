@@ -42,6 +42,8 @@ import androidx.compose.runtime.Immutable
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // ✅ Initialize PreferencesManager first
+        PreferencesManager.init(this)
         setContent {
             DebloaterTheme {
                 val snackbarHostState = remember { SnackbarHostState() }
@@ -103,8 +105,10 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
     var selectedApp by remember { mutableStateOf<AppData?>(null) }
     
-    // ✅ NEW: Track if Shizuku info dialog has been shown
-    var showShizukuInfoDialog by rememberSaveable { mutableStateOf(true) }
+    // ✅ NEW: Track if Shizuku info dialog has been shown (from SharedPreferences)
+    var showShizukuInfoDialog by remember { 
+        mutableStateOf(!PreferencesManager.isShizukuInfoShown())
+    }
 
     val backCallback = remember {
         object : OnBackPressedCallback(true) {
@@ -263,6 +267,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
             ShizukuInfoDialog(
                 onDismiss = {
                     showShizukuInfoDialog = false
+                    // Mark as shown in SharedPreferences
+                    PreferencesManager.setShizukuInfoShown(true)
                     // Trigger Shizuku prompt after user taps Next
                     ShizukuManager.requestShizukuPermission()
                 }
