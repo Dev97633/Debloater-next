@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import kotlinx.coroutines.CoroutineScope
@@ -121,23 +120,6 @@ object ShizukuManager {
         } catch (e: Exception) {
             showMessage("Bind failed: ${e.message}", SnackbarDuration.Long)
         }
-    }
-
-    // ✅ NEW: PUBLIC METHOD TO REQUEST PERMISSION FROM INTRO SCREEN
-    fun requestPermission(activity: ComponentActivity) {
-        if (Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            showMessage("Shizuku permission already granted")
-            attemptBind()
-            return
-        }
-
-        if (!Shizuku.pingBinder()) {
-            showMessage("Shizuku is not running", SnackbarDuration.Long)
-            return
-        }
-
-        // ✅ Request permission via Shizuku
-        Shizuku.requestPermission(REQUEST_CODE)
     }
 
     fun uninstall(packageName: String) {
