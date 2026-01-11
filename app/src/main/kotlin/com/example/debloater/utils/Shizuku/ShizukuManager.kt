@@ -28,11 +28,20 @@ object ShizukuManager {
         snackbarHostState = hostState
     }
 
-    private fun showMessage(msg: String, duration: SnackbarDuration = SnackbarDuration.Short) {
-        scope.launch {
-            snackbarHostState?.showSnackbar(msg, duration = duration) ?: Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-        }
+    private fun showMessage(
+    msg: String,
+    duration: SnackbarDuration = SnackbarDuration.Short
+) {
+    scope.launch {
+        snackbarHostState?.showSnackbar(msg, duration = duration)
+            ?: run {
+                if (::context.isInitialized) {
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                }
+            }
     }
+}
+
 
     private val requestPermissionResultListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
         if (requestCode == REQUEST_CODE) {
@@ -82,14 +91,16 @@ object ShizukuManager {
     }
 
     fun init(context: Context) {
-        this.context = context.applicationContext
+    if (::context.isInitialized) return   // ✅ PREVENT DOUBLE INIT
 
-        Shizuku.addRequestPermissionResultListener(requestPermissionResultListener)
-        Shizuku.addBinderReceivedListener(binderReceivedListener)
-        Shizuku.addBinderDeadListener(binderDeadListener)
+    this.context = context.applicationContext
 
-        attemptBind()
-    }
+    Shizuku.addRequestPermissionResultListener(requestPermissionResultListener)
+    Shizuku.addBinderReceivedListener(binderReceivedListener)
+    Shizuku.addBinderDeadListener(binderDeadListener)
+
+    attemptBind()
+}
 
     fun cleanup() {
         Shizuku.removeRequestPermissionResultListener(requestPermissionResultListener)
