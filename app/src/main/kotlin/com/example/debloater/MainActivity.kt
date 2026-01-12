@@ -11,6 +11,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -27,8 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
@@ -44,15 +42,12 @@ import androidx.compose.runtime.Immutable
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // ✅ Initialize PreferencesManager first
-        PreferencesManager.init(this)
+        ShizukuManager.init(this)
         setContent {
             DebloaterTheme {
                 val snackbarHostState = remember { SnackbarHostState() }
                 LaunchedEffect(Unit) {
                     ShizukuManager.setSnackbarHostState(snackbarHostState)
-                    // Initialize Shizuku after setting snackbar state
-                    ShizukuManager.init(this@MainActivity)
                 }
                 DebloaterScreen(snackbarHostState)
             }
@@ -87,7 +82,7 @@ data class AppData(
     val packageName: String,
     val appName: String,
     val isSystem: Boolean,
-    val icon: Drawable? = null
+    val icon: Drawable? = null  // ✅ PRE-CACHED ICON
 )
 
 @Composable
@@ -97,48 +92,16 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val pm = context.packageManager
     val scope = rememberCoroutineScope()
     
-    // ✅ Check if onboarding is complete
-    var onboardingComplete by remember { 
-        mutableStateOf(PreferencesManager.isOnboardingComplete())
-    }
-    
-    // If onboarding not complete, show OnboardingScreen
-    if (!onboardingComplete) {
-        OnboardingScreen(
-    onOnboardingComplete = {
-        PreferencesManager.setOnboardingComplete(true)
-        onboardingComplete = true
-        ShizukuManager.requestShizukuPermission()
-    }
-)
-        return
-    }
-    
+    // ✅ PRELOAD ALL APPS WITH ICONS AT STARTUP
     var appDataSnapshot by remember { mutableStateOf<List<AppData>?>(null) }
     var isLoadingApps by remember { mutableStateOf(true) }
+    
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
     var selectedApp by remember { mutableStateOf<AppData?>(null) }
-    var showWhatIsDebloaterDialog by rememberSaveable {
-    mutableStateOf(!PreferencesManager.isWhatIsDebloaterShown())
-}
-
-var showMisuseWarningDialog by rememberSaveable {
-    mutableStateOf(
-        PreferencesManager.isWhatIsDebloaterShown() &&
-        !PreferencesManager.isMisuseWarningShown()
-    )
-}
-
-var showShizukuInfoDialog by rememberSaveable {
-    mutableStateOf(
-        PreferencesManager.isMisuseWarningShown() &&
-        !PreferencesManager.isShizukuInfoShown()
-    )
-}
 
     val backCallback = remember {
         object : OnBackPressedCallback(true) {
@@ -148,7 +111,7 @@ var showShizukuInfoDialog by rememberSaveable {
                     selectedApp = null
                 } else {
                     isEnabled = false
-                    activity.onBackPressedDispatcher.onBackPressed()
+                    activity.onBackPressed()
                 }
             }
         }
@@ -159,6 +122,7 @@ var showShizukuInfoDialog by rememberSaveable {
         onDispose { backCallback.remove() }
     }
 
+    // ✅ LOAD ALL APPS WITH ICONS AT ONCE
     LaunchedEffect(Unit) {
         scope.launch(Dispatchers.Default) {
             val data = loadAllAppDataWithIcons(pm)
@@ -167,6 +131,7 @@ var showShizukuInfoDialog by rememberSaveable {
         }
     }
 
+    // ✅ Filter from snapshot (never null after load)
     val filteredAppData by remember {
         derivedStateOf {
             val apps = appDataSnapshot ?: return@derivedStateOf emptyList()
@@ -197,6 +162,7 @@ var showShizukuInfoDialog by rememberSaveable {
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
+        // ✅ Show full-screen loading indicator
         if (isLoadingApps) {
             Box(
                 modifier = Modifier
@@ -216,12 +182,13 @@ var showShizukuInfoDialog by rememberSaveable {
             }
         } else {
             AnimatedContent(
-    targetState = currentScreen,
- transitionSpec = {
-    fadeIn(tween(300)) + fadeOut(tween(300))
-}
-    label = "screen_transition"
-) { screen ->
+                targetState = currentScreen,
+                transitionSpec = {
+                    (fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left))
+                        .togetherWith(fadeOut(tween(300)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right))
+                },
+                label = "screen_transition"
+            ) { screen ->
                 when (screen) {
                     "apps" -> {
                         PullToRefreshBox(
@@ -235,8 +202,10 @@ var showShizukuInfoDialog by rememberSaveable {
                             },
                             modifier = Modifier.padding(padding)
                         ) {
+                            // ✅ SMOOTH GESTURE-CONTROLLED SCROLLING
                             LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(0.dp),
                                 flingBehavior = androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
                             ) {
@@ -289,43 +258,8 @@ var showShizukuInfoDialog by rememberSaveable {
                 }
             )
         }
-
-        // ✅ Dialog 1: What is Debloater (shows first)
-        if (showWhatIsDebloaterDialog) {
-            WhatIsDebloaterDialog(
-                onDismiss = {
-                    showWhatIsDebloaterDialog = false
-                    PreferencesManager.setWhatIsDebloaterShown(true)
-                }
-            )
-        }
-        
-        // ✅ Dialog 2: Misuse Warning (shows after What is Debloater)
-        if (showMisuseWarningDialog && PreferencesManager.isWhatIsDebloaterShown())
- {
-            MisuseWarningDialog(
-                onDismiss = {
-                    showMisuseWarningDialog = false
-                    PreferencesManager.setMisuseWarningShown(true)
-                }
-            )
-        }
-        
-        // ✅ Dialog 3: Shizuku Info (shows after Misuse Warning)
-        if (showShizukuInfoDialog && PreferencesManager.isMisuseWarningShown())
- {
-            ShizukuInfoDialog(
-                onDismiss = {
-                    showShizukuInfoDialog = false
-                    PreferencesManager.setShizukuInfoShown(true)
-                    ShizukuManager.requestShizukuPermission()
-                }
-            )
-        }
     }
 }
-
-// ✅ Old System App Warning Dialog - REMOVED
 
 @Composable
 fun DebloaterTopBar(
@@ -435,6 +369,7 @@ fun AppListItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ✅ ICON ALREADY CACHED - NO LOADING DURING SCROLL
             Box(
                 modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center
@@ -462,6 +397,7 @@ fun AppListItem(
                 }
             }
 
+            // ✅ App info container (flex, but constrained)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -475,6 +411,7 @@ fun AppListItem(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                // ✅ Package name + System badge in ONE row (never wraps)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -507,6 +444,7 @@ fun AppListItem(
                 }
             }
 
+            // ✅ Action buttons (fixed size, never wrap)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.wrapContentWidth()
@@ -536,6 +474,7 @@ fun AppListItem(
             }
         }
 
+        // ✅ Divider (subtle, no space waste)
         Divider(
             modifier = Modifier
                 .fillMaxWidth()
@@ -546,6 +485,7 @@ fun AppListItem(
     }
 }
 
+// ✅ PRELOAD ALL APPS WITH ICONS AT ONCE - OFF MAIN THREAD
 private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
     withContext(Dispatchers.Default) {
         try {
@@ -553,6 +493,7 @@ private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
                 .asSequence()
                 .mapNotNull { pkg ->
                     val app = pkg.applicationInfo ?: return@mapNotNull null
+                    // ✅ LOAD ICON HERE, NOT DURING SCROLL
                     val icon = try {
                         app.loadIcon(pm)
                     } catch (e: Exception) {
@@ -564,7 +505,7 @@ private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
                         appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
                         isSystem = app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
                                 app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
-                        icon = icon
+                        icon = icon  // ✅ CACHED HERE
                     )
                 }
                 .sortedBy { it.appName.lowercase() }
