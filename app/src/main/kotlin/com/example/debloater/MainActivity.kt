@@ -105,11 +105,12 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     // If onboarding not complete, show OnboardingScreen
     if (!onboardingComplete) {
         OnboardingScreen(
-            onOnboardingComplete = {
-                onboardingComplete = true
-                ShizukuManager.requestShizukuPermission()
-            }
-        )
+    onOnboardingComplete = {
+        PreferencesManager.setOnboardingComplete(true)
+        onboardingComplete = true
+        ShizukuManager.requestShizukuPermission()
+    }
+)
         return
     }
     
@@ -121,15 +122,24 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
     var selectedApp by remember { mutableStateOf<AppData?>(null) }
-    var showWhatIsDebloaterDialog by rememberSaveable { mutableStateOf(!PreferencesManager.isWhatIsDebloaterShown()) }
-    var showMisuseWarningDialog by rememberSaveable { mutableStateOf(PreferencesManager.isWhatIsDebloaterShown() &&
+    var showWhatIsDebloaterDialog by rememberSaveable {
+    mutableStateOf(!PreferencesManager.isWhatIsDebloaterShown())
+}
+
+var showMisuseWarningDialog by rememberSaveable {
+    mutableStateOf(
+        PreferencesManager.isWhatIsDebloaterShown() &&
         !PreferencesManager.isMisuseWarningShown()
     )
 }
-    var showShizukuInfoDialog by rememberSaveable { mutableStateOf(PreferencesManager.isMisuseWarningShown() &&
+
+var showShizukuInfoDialog by rememberSaveable {
+    mutableStateOf(
+        PreferencesManager.isMisuseWarningShown() &&
         !PreferencesManager.isShizukuInfoShown()
     )
 }
+
     val backCallback = remember {
         object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -138,7 +148,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     selectedApp = null
                 } else {
                     isEnabled = false
-                    activity.onBackPressed()
+                    activity.onBackPressedDispatcher.onBackPressed()
                 }
             }
         }
@@ -207,9 +217,9 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         } else {
             AnimatedContent(
     targetState = currentScreen,
-    transitionSpec = {
-        fadeIn(tween(300)) with fadeOut(tween(300))
-    },
+ transitionSpec = {
+    fadeIn(tween(300)) + fadeOut(tween(300))
+}
     label = "screen_transition"
 ) { screen ->
                 when (screen) {
@@ -291,7 +301,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         }
         
         // ✅ Dialog 2: Misuse Warning (shows after What is Debloater)
-        if (showMisuseWarningDialog && !showWhatIsDebloaterDialog) {
+        if (showMisuseWarningDialog && PreferencesManager.isWhatIsDebloaterShown())
+ {
             MisuseWarningDialog(
                 onDismiss = {
                     showMisuseWarningDialog = false
@@ -301,7 +312,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         }
         
         // ✅ Dialog 3: Shizuku Info (shows after Misuse Warning)
-        if (showShizukuInfoDialog && !showMisuseWarningDialog) {
+        if (showShizukuInfoDialog && PreferencesManager.isMisuseWarningShown())
+ {
             ShizukuInfoDialog(
                 onDismiss = {
                     showShizukuInfoDialog = false
