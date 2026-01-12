@@ -1,30 +1,4 @@
-// ✅ NEW: System App Warning Dialog (shows first)
-        if (showSystemAppWarningDialog) {
-            SystemAppWarningDialog(
-                onDismiss = {
-                    showSystemAppWarningDialog = false
-                    // Mark as shown in SharedPreferences
-                    PreferencesManager.setSystemAppWarningShown(true)
-                    // Now show Shizuku dialog
-                    showShizukuInfoDialog = true
-                }
-            )
-        }
-        
-        // ✅ NEW: Shizuku Info Dialog (shows after System App warning)
-        if (showShizukuInfoDialog && !showSystemAppWarningDialog) {
-            ShizukuInfoDialog(
-                onDismiss = {
-                    showShizukuInfoDialog = false
-                    // Mark as shown in SharedPreferences
-                    PreferencesManager.setShizukuInfoShown(true)
-                    // Trigger Shizuku prompt after user taps Next
-                    ShizukuManager.requestShizukuPermission()
-                }
-            )
-        }
-    }
-}@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.example.debloater
 
@@ -37,7 +11,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -45,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -53,13 +27,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -134,14 +107,17 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
     var selectedApp by remember { mutableStateOf<AppData?>(null) }
     
-    // ✅ Track if System App warning dialog has been shown (from SharedPreferences)
-    var showSystemAppWarningDialog by remember { 
-        mutableStateOf(!PreferencesManager.isSystemAppWarningShown())
+    // ✅ Track all three startup dialogs
+    var showWhatIsDebloaterDialog by remember { 
+        mutableStateOf(!PreferencesManager.isWhatIsDebloaterShown())
     }
     
-    // ✅ Track if Shizuku info dialog has been shown (from SharedPreferences)
+    var showMisuseWarningDialog by remember { 
+        mutableStateOf(!PreferencesManager.isMisuseWarningShown() && PreferencesManager.isWhatIsDebloaterShown())
+    }
+    
     var showShizukuInfoDialog by remember { 
-        mutableStateOf(!PreferencesManager.isShizukuInfoShown() && PreferencesManager.isSystemAppWarningShown())
+        mutableStateOf(!PreferencesManager.isShizukuInfoShown() && PreferencesManager.isMisuseWarningShown())
     }
 
     val backCallback = remember {
@@ -241,8 +217,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                             modifier = Modifier.padding(padding)
                         ) {
                             LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxSize(),
+                                modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(0.dp),
                                 flingBehavior = androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
                             ) {
@@ -296,14 +271,32 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
             )
         }
 
-        // ✅ NEW: Shizuku Info Dialog
-        if (showShizukuInfoDialog) {
+        // ✅ Dialog 1: What is Debloater (shows first)
+        if (showWhatIsDebloaterDialog) {
+            WhatIsDebloaterDialog(
+                onDismiss = {
+                    showWhatIsDebloaterDialog = false
+                    PreferencesManager.setWhatIsDebloaterShown(true)
+                }
+            )
+        }
+        
+        // ✅ Dialog 2: Misuse Warning (shows after What is Debloater)
+        if (showMisuseWarningDialog && !showWhatIsDebloaterDialog) {
+            MisuseWarningDialog(
+                onDismiss = {
+                    showMisuseWarningDialog = false
+                    PreferencesManager.setMisuseWarningShown(true)
+                }
+            )
+        }
+        
+        // ✅ Dialog 3: Shizuku Info (shows after Misuse Warning)
+        if (showShizukuInfoDialog && !showMisuseWarningDialog) {
             ShizukuInfoDialog(
                 onDismiss = {
                     showShizukuInfoDialog = false
-                    // Mark as shown in SharedPreferences
                     PreferencesManager.setShizukuInfoShown(true)
-                    // Trigger Shizuku prompt after user taps Next
                     ShizukuManager.requestShizukuPermission()
                 }
             )
@@ -311,7 +304,75 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     }
 }
 
-// ✅ NEW: Shizuku Information Dialog
+// ✅ Dialog 1: What is Debloater
+@Composable
+fun WhatIsDebloaterDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        title = {
+            Text("What is Debloater?")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Debloater is a tool that helps you remove unnecessary system apps (bloatware) from your device.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    "It allows you to disable or uninstall pre-installed apps that consume storage and battery, giving you more control over your device.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onDismiss() }) {
+                Text("Next")
+            }
+        }
+    )
+}
+
+// ✅ Dialog 2: Misuse Warning
+@Composable
+fun MisuseWarningDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        title = {
+            Text("⚠️ Warning")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Misusing this tool can break your device or cause critical errors.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    "Only remove apps you are certain about. Removing system apps without proper knowledge can render your device unstable or unusable.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Use this tool responsibly and at your own risk!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onDismiss() }) {
+                Text("I Understand")
+            }
+        }
+    )
+}
+
+// ✅ Dialog 3: Shizuku Information Dialog
 @Composable
 fun ShizukuInfoDialog(onDismiss: () -> Unit) {
     AlertDialog(
@@ -352,47 +413,7 @@ fun ShizukuInfoDialog(onDismiss: () -> Unit) {
     )
 }
 
-// ✅ NEW: System App Warning Dialog (shown at startup)
-@Composable
-fun SystemAppWarningDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = { onDismiss() },
-        title = {
-            Text("⚠️ System App Warning")
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    "Uninstalling system apps may break your device or cause unexpected behavior.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    "System apps are critical for device functionality. Removing them could render your device unstable or unusable.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    "This action is irreversible without a factory reset.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    "Use at your own risk!",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onDismiss() }) {
-                Text("I Understand")
-            }
-        }
-    )
-}
+// ✅ Old System App Warning Dialog - REMOVED
 
 @Composable
 fun DebloaterTopBar(
