@@ -97,6 +97,22 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val pm = context.packageManager
     val scope = rememberCoroutineScope()
     
+    // ✅ Check if onboarding is complete
+    var onboardingComplete by remember { 
+        mutableStateOf(PreferencesManager.isOnboardingComplete())
+    }
+    
+    // If onboarding not complete, show OnboardingScreen
+    if (!onboardingComplete) {
+        OnboardingScreen(
+            onOnboardingComplete = {
+                onboardingComplete = true
+                ShizukuManager.requestShizukuPermission()
+            }
+        )
+        return
+    }
+    
     var appDataSnapshot by remember { mutableStateOf<List<AppData>?>(null) }
     var isLoadingApps by remember { mutableStateOf(true) }
     
@@ -106,19 +122,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
     var selectedApp by remember { mutableStateOf<AppData?>(null) }
-    
-    // ✅ Track all three startup dialogs
-    var showWhatIsDebloaterDialog by remember { 
-        mutableStateOf(!PreferencesManager.isWhatIsDebloaterShown())
-    }
-    
-    var showMisuseWarningDialog by remember { 
-        mutableStateOf(!PreferencesManager.isMisuseWarningShown() && PreferencesManager.isWhatIsDebloaterShown())
-    }
-    
-    var showShizukuInfoDialog by remember { 
-        mutableStateOf(!PreferencesManager.isShizukuInfoShown() && PreferencesManager.isMisuseWarningShown())
-    }
 
     val backCallback = remember {
         object : OnBackPressedCallback(true) {
