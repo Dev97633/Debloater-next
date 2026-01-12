@@ -12,7 +12,11 @@
     <string name="about_github_url">https://github.com/Dev97633/Debloater-next</string>  <!-- CHANGE THIS -->
     <string name="about_license">Licensed under MIT</string>
     <string name="about_shizuku_credit">Thanks to Rikka for Shizuku ❤️</string>
-    <string name="onboarding_title">Welcome to Debloater</string>
-    <string name="onboarding_message">Shizuku is necessary to use this app.\nIt allows safe, non-root access to disable/uninstall apps.</string>
-    <string name="onboarding_next">Next</string>
+    <string name="onboarding_step1_title">How Debloater Works</string>
+    <string name="onboarding_step1_message">Debloater helps you remove or disable bloatware (pre-installed apps) safely using Shizuku. This improves performance, saves battery, and gives you more control over your device — all without root.</string>
+    <string name="onboarding_step2_title">Important Warning</string>
+    <string name="onboarding_step2_message">Disabling or uninstalling system apps can break features, cause instability, or require a factory reset. Use with caution and only disable/uninstall apps you understand.</string>
+    <string name="onboarding_step2_confirm">I understand the risks and want to continue</string>
+    <string name="onboarding_step3_title">Shizuku is Required</string>
+    <string name="onboarding_step3_message">This app uses Shizuku to get elevated permissions without root. Please grant permission when prompted so Debloater can work properly.</string>
 </resources>
