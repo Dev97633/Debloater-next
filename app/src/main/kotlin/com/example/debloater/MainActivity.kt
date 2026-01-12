@@ -40,6 +40,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private const val PREFS_NAME = "DebloaterPrefs"
 private const val KEY_FIRST_LAUNCH = "first_launch"
