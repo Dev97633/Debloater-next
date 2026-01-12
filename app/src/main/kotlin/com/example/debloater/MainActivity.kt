@@ -2,6 +2,7 @@
 
 package com.example.debloater
 
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Build
@@ -9,15 +10,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -25,8 +26,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
@@ -35,9 +41,10 @@ import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Immutable
+
+private const val PREFS_NAME = "DebloaterPrefs"
+private const val KEY_FIRST_LAUNCH = "first_launch"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,7 +89,7 @@ data class AppData(
     val packageName: String,
     val appName: String,
     val isSystem: Boolean,
-    val icon: Drawable? = null  // ✅ PRE-CACHED ICON
+    val icon: Drawable? = null
 )
 
 @Composable
@@ -91,22 +98,28 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val activity = (LocalContext.current as ComponentActivity)
     val pm = context.packageManager
     val scope = rememberCoroutineScope()
-    
-    // ✅ PRELOAD ALL APPS WITH ICONS AT STARTUP
-    var appDataSnapshot by remember { mutableStateOf<List<AppData>?>(null) }
-    var isLoadingApps by remember { mutableStateOf(true) }
-    
+
+    // First launch check
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    var isFirstLaunch by remember { mutableStateOf(prefs.getBoolean(KEY_FIRST_LAUNCH, true)) }
+
+    var currentScreen by rememberSaveable { mutableStateOf(if (isFirstLaunch) "onboarding" else "apps") }
+    var selectedApp by rememberSaveable<AppData?>(null) { mutableStateOf(null) }
+
+    var allAppData by remember { mutableStateOf<List<AppData>>(emptyList()) }
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
-    var currentScreen by rememberSaveable { mutableStateOf("apps") }
-    var selectedApp by remember { mutableStateOf<AppData?>(null) }
 
+    // Handle system back button
     val backCallback = remember {
         object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (currentScreen != "apps") {
+                if (currentScreen == "onboarding") {
+                    isEnabled = false
+                    activity.onBackPressed()
+                } else if (currentScreen != "apps") {
                     currentScreen = "apps"
                     selectedApp = null
                 } else {
@@ -122,142 +135,287 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         onDispose { backCallback.remove() }
     }
 
-    // ✅ LOAD ALL APPS WITH ICONS AT ONCE
-    LaunchedEffect(Unit) {
-        scope.launch(Dispatchers.Default) {
-            val data = loadAllAppDataWithIcons(pm)
-            appDataSnapshot = data
-            isLoadingApps = false
+    // Load apps only after onboarding
+    LaunchedEffect(currentScreen) {
+        if (currentScreen == "apps" && allAppData.isEmpty()) {
+            allAppData = loadAllAppDataWithIcons(pm)
         }
     }
 
-    // ✅ Filter from snapshot (never null after load)
     val filteredAppData by remember {
         derivedStateOf {
-            val apps = appDataSnapshot ?: return@derivedStateOf emptyList()
-            if (query.isBlank()) apps
-            else apps.filter {
+            if (query.isBlank()) allAppData
+            else allAppData.filter {
                 it.appName.contains(query, ignoreCase = true) ||
                 it.packageName.contains(query, ignoreCase = true)
             }
         }
     }
 
-    Scaffold(
-        topBar = {
-            DebloaterTopBar(
-                query = query,
-                active = active,
-                onQueryChange = { query = it },
-                onActiveChange = { active = it },
-                suggestions = filteredAppData.take(10),
-                onSuggestionClick = { query = it; active = false },
-                currentScreen = currentScreen,
-                onNavigate = { currentScreen = it },
-                onBack = {
-                    currentScreen = "apps"
-                    selectedApp = null
-                }
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { padding ->
-        // ✅ Show full-screen loading indicator
-        if (isLoadingApps) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+    if (currentScreen == "onboarding") {
+        OnboardingScreen {
+            prefs.edit().putBoolean(KEY_FIRST_LAUNCH, false).apply()
+            currentScreen = "apps"
+        }
+    } else {
+        Scaffold(
+            topBar = {
+                DebloaterTopBar(
+                    query = query,
+                    active = active,
+                    onQueryChange = { query = it },
+                    onActiveChange = { active = it },
+                    suggestions = filteredAppData.take(10),
+                    onSuggestionClick = { query = it; active = false },
+                    currentScreen = currentScreen,
+                    onNavigate = { currentScreen = it },
+                    onBack = {
+                        currentScreen = "apps"
+                        selectedApp = null
+                    }
+                )
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) }
+        ) { padding ->
+            if (allAppData.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Text("Loading apps...", style = MaterialTheme.typography.bodyMedium)
+                    CircularProgressIndicator()
                 }
-            }
-        } else {
-            AnimatedContent(
-                targetState = currentScreen,
-                transitionSpec = {
-                    (fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left))
-                        .togetherWith(fadeOut(tween(300)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right))
-                },
-                label = "screen_transition"
-            ) { screen ->
-                when (screen) {
-                    "apps" -> {
-                        PullToRefreshBox(
-                            isRefreshing = isRefreshing,
-                            onRefresh = {
-                                scope.launch {
-                                    isRefreshing = true
-                                    appDataSnapshot = loadAllAppDataWithIcons(pm)
-                                    isRefreshing = false
+            } else {
+                AnimatedContent(
+                    targetState = currentScreen,
+                    transitionSpec = {
+                        (fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left))
+                            .togetherWith(fadeOut(tween(300)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right))
+                    },
+                    label = "screen_transition"
+                ) { screen ->
+                    when (screen) {
+                        "apps" -> {
+                            PullToRefreshBox(
+                                isRefreshing = isRefreshing,
+                                onRefresh = {
+                                    scope.launch {
+                                        isRefreshing = true
+                                        allAppData = loadAllAppDataWithIcons(pm)
+                                        isRefreshing = false
+                                    }
                                 }
-                            },
-                            modifier = Modifier.padding(padding)
-                        ) {
-                            // ✅ SMOOTH GESTURE-CONTROLLED SCROLLING
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(0.dp),
-                                flingBehavior = androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
                             ) {
-                                items(filteredAppData, key = { it.packageName }) { appData ->
-                                    AppListItem(
-                                        appData = appData,
-                                        onClick = {
-                                            selectedApp = appData
-                                            currentScreen = "details"
-                                        },
-                                        onDisable = { ShizukuManager.disable(appData.packageName) },
-                                        onUninstall = { confirmUninstall = appData.packageName }
-                                    )
+                                LazyColumn(
+                                    modifier = Modifier.padding(padding),
+                                    contentPadding = PaddingValues(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(filteredAppData, key = { it.packageName }) { appData ->
+                                        AppListItem(
+                                            appData = appData,
+                                            onClick = {
+                                                selectedApp = appData
+                                                currentScreen = "details"
+                                            },
+                                            onDisable = { ShizukuManager.disable(appData.packageName) },
+                                            onUninstall = { confirmUninstall = appData.packageName }
+                                        )
+                                    }
                                 }
                             }
                         }
+                        "details" -> selectedApp?.let { app ->
+                            AppDetailsScreen(
+                                appData = app,
+                                onBack = {
+                                    currentScreen = "apps"
+                                    selectedApp = null
+                                },
+                                onDisable = { ShizukuManager.disable(app.packageName) },
+                                onUninstall = { confirmUninstall = app.packageName }
+                            )
+                        } ?: Box(Modifier.fillMaxSize())
+                        "about" -> AboutScreen()
                     }
-                    "details" -> selectedApp?.let { app ->
-                        AppDetailsScreen(
-                            appData = app,
-                            onBack = {
-                                currentScreen = "apps"
-                                selectedApp = null
-                            },
-                            onDisable = { ShizukuManager.disable(app.packageName) },
-                            onUninstall = { confirmUninstall = app.packageName }
+                }
+            }
+
+            confirmUninstall?.let { pkg ->
+                AlertDialog(
+                    onDismissRequest = { confirmUninstall = null },
+                    title = { Text("Confirm uninstall") },
+                    text = { Text("Uninstall $pkg ?") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            scope.launch {
+                                ShizukuManager.uninstall(pkg)
+                                allAppData = allAppData.filter { it.packageName != pkg }
+                            }
+                            confirmUninstall = null
+                        }) { Text("Uninstall") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { confirmUninstall = null }) { Text("Cancel") }
+                    }
+                )
+            }
+        }
+    }
+}
+
+// Onboarding Screens
+@Composable
+fun OnboardingScreen(onComplete: () -> Unit) {
+    var currentStep by rememberSaveable { mutableStateOf(0) }
+    var hasConfirmedWarning by rememberSaveable { mutableStateOf(false) }
+
+    Scaffold(
+        bottomBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Stepper dots
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    repeat(3) { index ->
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(if (index == currentStep) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
                         )
-                    } ?: Box(Modifier.fillMaxSize())
-                    "about" -> AboutScreen()
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        if (currentStep < 2) {
+                            currentStep++
+                        } else {
+                            onComplete()
+                        }
+                    },
+                    enabled = if (currentStep == 1) hasConfirmedWarning else true
+                ) {
+                    Text(if (currentStep == 2) "Grant Permission" else "Next")
                 }
             }
         }
-
-        confirmUninstall?.let { pkg ->
-            AlertDialog(
-                onDismissRequest = { confirmUninstall = null },
-                title = { Text("Confirm uninstall") },
-                text = { Text("Uninstall $pkg ?") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        scope.launch {
-                            ShizukuManager.uninstall(pkg)
-                            appDataSnapshot = appDataSnapshot?.filter { it.packageName != pkg }
-                        }
-                        confirmUninstall = null
-                    }) { Text("Uninstall") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { confirmUninstall = null }) { Text("Cancel") }
+    ) { padding ->
+        AnimatedContent(
+            targetState = currentStep,
+            transitionSpec = {
+                (slideInHorizontally { it } + fadeIn())
+                    .togetherWith(slideOutHorizontally { -it } + fadeOut())
+            },
+            modifier = Modifier.padding(padding)
+        ) { step ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                when (step) {
+                    0 -> OnboardingStep1()
+                    1 -> OnboardingStep2(hasConfirmedWarning) { hasConfirmedWarning = it }
+                    2 -> OnboardingStep3()
                 }
-            )
+            }
         }
+    }
+}
+
+@Composable
+fun OnboardingStep1() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            Icons.Default.DeleteSweep,
+            contentDescription = null,
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = stringResource(R.string.onboarding_step1_title),
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.onboarding_step1_message),
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun OnboardingStep2(hasConfirmed: Boolean, onConfirmedChange: (Boolean) -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            Icons.Default.WarningAmber,
+            contentDescription = null,
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.error
+        )
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = stringResource(R.string.onboarding_step2_title),
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.onboarding_step2_message),
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(32.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Checkbox(
+                checked = hasConfirmed,
+                onCheckedChange = onConfirmedChange
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.onboarding_step2_confirm))
+        }
+    }
+}
+
+@Composable
+fun OnboardingStep3() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            Icons.Default.Security,
+            contentDescription = null,
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = stringResource(R.string.onboarding_step3_title),
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.onboarding_step3_message),
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
