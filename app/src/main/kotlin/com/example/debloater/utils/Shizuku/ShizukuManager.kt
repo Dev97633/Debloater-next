@@ -88,8 +88,7 @@ object ShizukuManager {
         Shizuku.addBinderReceivedListener(binderReceivedListener)
         Shizuku.addBinderDeadListener(binderDeadListener)
 
-        // ✅ Only setup listeners, don't attempt bind yet
-        // User will trigger binding via requestShizukuPermission() after dialog
+        attemptBind()
     }
 
     fun cleanup() {
@@ -120,25 +119,6 @@ object ShizukuManager {
             Shizuku.bindUserService(userServiceArgs.value, serviceConnection)
         } catch (e: Exception) {
             showMessage("Bind failed: ${e.message}", SnackbarDuration.Long)
-        }
-    }
-
-    // ✅ NEW: Public method called when user taps "Next" in Shizuku info dialog
-    fun requestShizukuPermission() {
-        if (isBound) {
-            showMessage("Shizuku already connected!", SnackbarDuration.Short)
-            return
-        }
-
-        if (!Shizuku.pingBinder()) {
-            showMessage("Shizuku is not running. Please install and start Shizuku.", SnackbarDuration.Long)
-            return
-        }
-
-        if (Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            Shizuku.requestPermission(REQUEST_CODE)
-        } else {
-            attemptBind()
         }
     }
 
