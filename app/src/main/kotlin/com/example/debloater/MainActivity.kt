@@ -115,14 +115,21 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     
     var appDataSnapshot by remember { mutableStateOf<List<AppData>?>(null) }
     var isLoadingApps by remember { mutableStateOf(true) }
-    
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmUninstall by remember { mutableStateOf<String?>(null) }
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
     var selectedApp by remember { mutableStateOf<AppData?>(null) }
-
+    var showWhatIsDebloaterDialog by rememberSaveable { mutableStateOf(!PreferencesManager.isWhatIsDebloaterShown()) }
+    var showMisuseWarningDialog by rememberSaveable { mutableStateOf(PreferencesManager.isWhatIsDebloaterShown() &&
+        !PreferencesManager.isMisuseWarningShown()
+    )
+}
+    var showShizukuInfoDialog by rememberSaveable { mutableStateOf(PreferencesManager.isMisuseWarningShown() &&
+        !PreferencesManager.isShizukuInfoShown()
+    )
+}
     val backCallback = remember {
         object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -199,13 +206,12 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
             }
         } else {
             AnimatedContent(
-                targetState = currentScreen,
-                transitionSpec = {
-                    (fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left))
-                        .togetherWith(fadeOut(tween(300)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right))
-                },
-                label = "screen_transition"
-            ) { screen ->
+    targetState = currentScreen,
+    transitionSpec = {
+        fadeIn(tween(300)) with fadeOut(tween(300))
+    },
+    label = "screen_transition"
+) { screen ->
                 when (screen) {
                     "apps" -> {
                         PullToRefreshBox(
