@@ -1,4 +1,30 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+// ✅ NEW: System App Warning Dialog (shows first)
+        if (showSystemAppWarningDialog) {
+            SystemAppWarningDialog(
+                onDismiss = {
+                    showSystemAppWarningDialog = false
+                    // Mark as shown in SharedPreferences
+                    PreferencesManager.setSystemAppWarningShown(true)
+                    // Now show Shizuku dialog
+                    showShizukuInfoDialog = true
+                }
+            )
+        }
+        
+        // ✅ NEW: Shizuku Info Dialog (shows after System App warning)
+        if (showShizukuInfoDialog && !showSystemAppWarningDialog) {
+            ShizukuInfoDialog(
+                onDismiss = {
+                    showShizukuInfoDialog = false
+                    // Mark as shown in SharedPreferences
+                    PreferencesManager.setShizukuInfoShown(true)
+                    // Trigger Shizuku prompt after user taps Next
+                    ShizukuManager.requestShizukuPermission()
+                }
+            )
+        }
+    }
+}@file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.example.debloater
 
@@ -31,6 +57,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -105,9 +134,14 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var currentScreen by rememberSaveable { mutableStateOf("apps") }
     var selectedApp by remember { mutableStateOf<AppData?>(null) }
     
-    // ✅ NEW: Track if Shizuku info dialog has been shown (from SharedPreferences)
+    // ✅ Track if System App warning dialog has been shown (from SharedPreferences)
+    var showSystemAppWarningDialog by remember { 
+        mutableStateOf(!PreferencesManager.isSystemAppWarningShown())
+    }
+    
+    // ✅ Track if Shizuku info dialog has been shown (from SharedPreferences)
     var showShizukuInfoDialog by remember { 
-        mutableStateOf(!PreferencesManager.isShizukuInfoShown())
+        mutableStateOf(!PreferencesManager.isShizukuInfoShown() && PreferencesManager.isSystemAppWarningShown())
     }
 
     val backCallback = remember {
@@ -313,6 +347,48 @@ fun ShizukuInfoDialog(onDismiss: () -> Unit) {
         dismissButton = {
             TextButton(onClick = { onDismiss() }) {
                 Text("Cancel")
+            }
+        }
+    )
+}
+
+// ✅ NEW: System App Warning Dialog (shown at startup)
+@Composable
+fun SystemAppWarningDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        title = {
+            Text("⚠️ System App Warning")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Uninstalling system apps may break your device or cause unexpected behavior.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    "System apps are critical for device functionality. Removing them could render your device unstable or unusable.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "This action is irreversible without a factory reset.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Use at your own risk!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onDismiss() }) {
+                Text("I Understand")
             }
         }
     )
