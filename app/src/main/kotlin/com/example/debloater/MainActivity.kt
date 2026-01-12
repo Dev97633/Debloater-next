@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,7 +30,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -104,7 +102,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var isFirstLaunch by remember { mutableStateOf(prefs.getBoolean(KEY_FIRST_LAUNCH, true)) }
 
     var currentScreen by rememberSaveable { mutableStateOf(if (isFirstLaunch) "onboarding" else "apps") }
-    var selectedApp by rememberSaveable<AppData?>(null) { mutableStateOf(null) }
+    var selectedApp by remember { mutableStateOf<AppData?>(null) }
 
     var allAppData by remember { mutableStateOf<List<AppData>>(emptyList()) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -642,7 +640,6 @@ fun AppListItem(
         )
     }
 }
-
 // ✅ PRELOAD ALL APPS WITH ICONS AT ONCE - OFF MAIN THREAD
 private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
     withContext(Dispatchers.Default) {
@@ -651,19 +648,17 @@ private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
                 .asSequence()
                 .mapNotNull { pkg ->
                     val app = pkg.applicationInfo ?: return@mapNotNull null
-                    // ✅ LOAD ICON HERE, NOT DURING SCROLL
                     val icon = try {
                         app.loadIcon(pm)
                     } catch (e: Exception) {
                         null
                     }
-                    
                     AppData(
                         packageName = pkg.packageName,
                         appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
                         isSystem = app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
                                 app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
-                        icon = icon  // ✅ CACHED HERE
+                        icon = icon
                     )
                 }
                 .sortedBy { it.appName.lowercase() }
