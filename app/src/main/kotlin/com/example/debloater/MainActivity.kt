@@ -296,8 +296,9 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                         if (currentStep < 2) {
                             currentStep++
                         } else {
-                            onComplete()
-                        }
+             ShizukuManager.requestPermissionAndBind()
+             onComplete()
+                       }
                     },
                     enabled = if (currentStep == 1) hasConfirmedWarning else true
                 ) {
