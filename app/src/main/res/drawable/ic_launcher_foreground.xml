@@ -5,57 +5,19 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Trash can body (gray metallic look) -->
+    <!-- Trash can body -->
     <path
         android:fillColor="#FF424242"
-        android:pathData="M18,36h72v54a6,6 0 0 1 -6,6H24a6,6 0 0 1 -6,-6z" />
+        android:pathData="M24,30h60v48a6,6 0 0 1 -6,6H30a6,6 0 0 1 -6,-6z" />
 
-    <!-- Trash can lid (top part) -->
+    <!-- Lid -->
     <path
         android:fillColor="#FF616161"
-        android:pathData="M18,30h72v6H18z" />
+        android:pathData="M24,24h60v6H24z" />
 
     <!-- Lid handle -->
     <path
         android:fillColor="#FF424242"
-        android:pathData="M48,18h12v12h-12z" />
-
-    <!-- Android logo inside the trash can -->
-    <group
-        android:translateX="30"
-        android:translateY="42"
-        android:scaleX="0.45"
-        android:scaleY="0.45">
-
-        <!-- Android head -->
-        <path
-            android:fillColor="#A4C439"
-            android:pathData="M24,0C10.75,0 0,10.75 0,24s10.75,24 24,24 24,-10.75 24,-24S37.25,0 24,0zM24,42c-9.94,0 -18,-8.06 -18,-18S14.06,6 24,6s18,8.06 18,18 -8.06,18 -18,18z" />
-
-        <!-- Left antenna -->
-        <path
-            android:fillColor="#A4C439"
-            android:pathData="M12,12l-6,-6" />
-
-        <!-- Right antenna -->
-        <path
-            android:fillColor="#A4C439"
-            android:pathData="M36,12l6,-6" />
-
-        <!-- Left eye -->
-        <path
-            android:fillColor="#000000"
-            android:pathData="M18,18m-4,0a4,4 0 1 1 8,0a4,4 0 1 1 -8,0" />
-
-        <!-- Right eye -->
-        <path
-            android:fillColor="#000000"
-            android:pathData="M30,18m-4,0a4,4 0 1 1 8,0a4,4 0 1 1 -8,0" />
-
-        <!-- Mouth (happy expression) -->
-        <path
-            android:fillColor="#000000"
-            android:pathData="M16,28 Q24,36 32,28" />
-    </group>
+        android:pathData="M48,12h12v12h-12z" />
 
 </vector>
