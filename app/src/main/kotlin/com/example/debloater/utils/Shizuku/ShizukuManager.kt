@@ -87,11 +87,13 @@ object ShizukuManager {
         Shizuku.addRequestPermissionResultListener(requestPermissionResultListener)
         Shizuku.addBinderReceivedListener(binderReceivedListener)
         Shizuku.addBinderDeadListener(binderDeadListener)
-
-        attemptBind()
     }
 
-    fun cleanup() {
+    fun requestPermissionAndBind() {
+    attemptBind()
+}
+
+   fun cleanup() {
         Shizuku.removeRequestPermissionResultListener(requestPermissionResultListener)
         Shizuku.removeBinderReceivedListener(binderReceivedListener)
         Shizuku.removeBinderDeadListener(binderDeadListener)
