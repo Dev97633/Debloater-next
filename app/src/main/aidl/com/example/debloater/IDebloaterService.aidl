@@ -1,4 +1,4 @@
-package com.example.debloater;
+package com.dev.debloater;
 
 interface IDebloaterService {
     void uninstall(String packageName);
