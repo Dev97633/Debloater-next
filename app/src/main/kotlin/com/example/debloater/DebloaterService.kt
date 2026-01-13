@@ -1,4 +1,4 @@
-package com.example.debloater
+package com.dev.debloater
 
 import android.os.Process
 import com.example.debloater.IDebloaterService
