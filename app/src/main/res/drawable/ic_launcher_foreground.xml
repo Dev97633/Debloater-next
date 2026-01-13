@@ -5,19 +5,57 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Trash can body -->
-    <path
-        android:fillColor="#FF424242"
-        android:pathData="M24,30h60v48a6,6 0 0 1 -6,6H30a6,6 0 0 1 -6,-6z" />
-
-    <!-- Lid -->
+    <!-- Trash bin body (metallic gray with slight shine) -->
     <path
         android:fillColor="#FF616161"
-        android:pathData="M24,24h60v6H24z" />
+        android:pathData="M20,36h68v48a8,8 0 0 1 -8,8H28a8,8 0 0 1 -8,-8z" />
+
+    <!-- Inner bin shadow for depth -->
+    <path
+        android:fillColor="#FF424242"
+        android:pathData="M24,40h60v40a4,4 0 0 1 -4,4H28a4,4 0 0 1 -4,-4z" />
+
+    <!-- Open lid (tilted back) -->
+    <path
+        android:fillColor="#FF757575"
+        android:pathData="M20,30 Q54,6 88,30 L88,36 L20,36 Z" />
 
     <!-- Lid handle -->
     <path
         android:fillColor="#FF424242"
-        android:pathData="M48,12h12v12h-12z" />
+        android:pathData="M50,12h8v12h-8z" />
+
+    <!-- Android logo inside trash bin (with subtle glow) -->
+    <group
+        android:translateX="34"
+        android:translateY="48"
+        android:scaleX="0.4"
+        android:scaleY="0.4">
+
+        <!-- Glow behind Android head -->
+        <path
+            android:fillColor="#80A4C439"
+            android:pathData="M24,0C10.75,0 0,10.75 0,24s10.75,24 24,24 24,-10.75 24,-24S37.25,0 24,0z" />
+
+        <!-- Android head -->
+        <path
+            android:fillColor="#A4C439"
+            android:pathData="M24,0C10.75,0 0,10.75 0,24s10.75,24 24,24 24,-10.75 24,-24S37.25,0 24,0zM24,42c-9.94,0 -18,-8.06 -18,-18S14.06,6 24,6s18,8.06 18,18 -8.06,18 -18,18z" />
+
+        <!-- Antennas -->
+        <path
+            android:fillColor="#A4C439"
+            android:pathData="M12,12l-6,-6 M36,12l6,-6" />
+
+        <!-- Eyes -->
+        <path
+            android:fillColor="#000000"
+            android:pathData="M18,18m-4,0a4,4 0 1 1 8,0a4,4 0 1 1 -8,0 M30,18m-4,0a4,4 0 1 1 8,0a4,4 0 1 1 -8,0" />
+
+        <!-- Mouth (happy/curved) -->
+        <path
+            android:fillColor="#000000"
+            android:pathData="M16,28 Q24,36 32,28" />
+    </group>
 
 </vector>
