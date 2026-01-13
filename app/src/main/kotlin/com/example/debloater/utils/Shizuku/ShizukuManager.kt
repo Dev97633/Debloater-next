@@ -1,4 +1,4 @@
-package com.example.debloater
+package com.dev.debloater
 
 import android.content.ComponentName
 import android.content.Context
