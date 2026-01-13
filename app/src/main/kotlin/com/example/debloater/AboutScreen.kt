@@ -1,5 +1,5 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
-package com.example.debloater
+package com.dev.debloater
 
 import android.os.Build
 import androidx.compose.foundation.clickable
