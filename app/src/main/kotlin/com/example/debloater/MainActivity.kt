@@ -198,34 +198,38 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     when (screen) {
                         "apps" -> {
                             PullToRefreshBox(
-                                isRefreshing = isRefreshing,
-                                onRefresh = {
-                                    scope.launch {
-                                        isRefreshing = true
-                                        allAppData = loadAllAppDataWithIcons(pm)
-                                        isRefreshing = false
-                                    }
-                                }
-                            ) {
-                                LazyColumn(
-                                    modifier = Modifier.padding(padding),
-                                    contentPadding = PaddingValues(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    items(filteredAppData, key = { it.packageName }) { appData ->
-                                        AppListItem(
-                                            appData = appData,
-                                            onClick = {
-                                                selectedApp = appData
-                                                currentScreen = "details"
-                                            },
-                                            onDisable = { ShizukuManager.disable(appData.packageName) },
-                                            onUninstall = { confirmUninstall = appData.packageName }
-                                        )
-                                    }
-                                }
-                            }
-                        }
+    modifier = Modifier.padding(padding), 
+    isRefreshing = isRefreshing,
+    onRefresh = {
+        scope.launch {
+            isRefreshing = true
+            allAppData = loadAllAppDataWithIcons(pm)
+            isRefreshing = false
+        }
+    }
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(filteredAppData, key = { it.packageName }) { appData ->
+            AppListItem(
+                appData = appData,
+                onClick = {
+                    selectedApp = appData
+                    currentScreen = "details"
+                },
+                onDisable = {
+                    ShizukuManager.disable(appData.packageName)
+                },
+                onUninstall = {
+                    confirmUninstall = appData.packageName
+                }
+            )
+        }
+    }
+}
+                      }
                         "details" -> selectedApp?.let { app ->
                             AppDetailsScreen(
                                 appData = app,
