@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
-package com.example.debloater
+package com.dev.debloater
 
 import android.content.Context
 import android.content.pm.PackageManager
