@@ -6,11 +6,11 @@ plugins {
 
 
 android {
-    namespace = "com.example.debloater"
+    namespace = "com.dev.debloater"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.debloater"
+        applicationId = "com.dev.debloater"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
