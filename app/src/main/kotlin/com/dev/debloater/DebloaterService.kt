@@ -1,7 +1,7 @@
 package com.dev.debloater
 
 import android.os.Process
-import com.example.debloater.IDebloaterService
+import com.dev.debloater.IDebloaterService
 import java.io.DataOutputStream
 
 class DebloaterService : IDebloaterService.Stub() {
