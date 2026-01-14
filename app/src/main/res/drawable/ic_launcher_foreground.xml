@@ -36,18 +36,22 @@
             h-32
             z" />
 
-    <!-- Android left eye -->
-    <circle
+    <!-- Android left eye (circle via path) -->
+    <path
         android:fillColor="#000000"
-        android:cx="50"
-        android:cy="48"
-        android:r="2" />
+        android:pathData="
+            M50,48
+            m-2,0
+            a2,2 0 1,0 4,0
+            a2,2 0 1,0 -4,0" />
 
-    <!-- Android right eye -->
-    <circle
+    <!-- Android right eye (circle via path) -->
+    <path
         android:fillColor="#000000"
-        android:cx="58"
-        android:cy="48"
-        android:r="2" />
+        android:pathData="
+            M58,48
+            m-2,0
+            a2,2 0 1,0 4,0
+            a2,2 0 1,0 -4,0" />
 
 </vector>
