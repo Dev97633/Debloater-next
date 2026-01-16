@@ -48,7 +48,7 @@ fun AboutScreen() {
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Spacer(Modifier.height(48.dp))
+       /* Spacer(Modifier.height(48.dp))
         Text(
             text = stringResource(R.string.about_developed_by),
             style = MaterialTheme.typography.titleMedium
@@ -58,7 +58,7 @@ fun AboutScreen() {
             text = stringResource(R.string.about_developer_name),
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.primary
-        )
+        )*/
         Spacer(Modifier.height(40.dp))
 
         // Device Information Card
