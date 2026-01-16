@@ -531,7 +531,7 @@ fun AppListItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ✅ ICON ALREADY CACHED - NO LOADING DURING SCROLL
+           
             Box(
                 modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center
@@ -559,7 +559,7 @@ fun AppListItem(
                 }
             }
 
-            // ✅ App info container (flex, but constrained)
+            
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -573,7 +573,6 @@ fun AppListItem(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                // ✅ Package name + System badge in ONE row (never wraps)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -606,7 +605,6 @@ fun AppListItem(
                 }
             }
 
-            // ✅ Action buttons (fixed size, never wrap)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.wrapContentWidth()
@@ -636,7 +634,6 @@ fun AppListItem(
             }
         }
 
-        // ✅ Divider (subtle, no space waste)
         Divider(
             modifier = Modifier
                 .fillMaxWidth()
@@ -646,7 +643,6 @@ fun AppListItem(
         )
     }
 }
-// ✅ PRELOAD ALL APPS WITH ICONS AT ONCE - OFF MAIN THREAD
 private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
     withContext(Dispatchers.Default) {
         try {
