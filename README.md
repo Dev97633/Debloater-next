@@ -56,4 +56,16 @@
 ```bash
 git clone https://github.com/Dev97633/Debloater-next.git
 cd Debloater
-./gradlew assembleDebug
+./gradlew assembleDebug 
+```
+
+## Credits
+
+- **[Shizuku](https://github.com/RikkaApps/Shizuku)** by Rikka — the core engine for privileged operations without root
+- **Jetpack Compose & Material 3** by Google — for the beautiful, responsive, and modern UI with dynamic colors
+- **Coil** — fast and efficient image loading for app icons
+- All other open-source libraries listed in `build.gradle.kts`
+
+Special thanks to the entire Android open-source community ❤️
+
+Developed with ❤️ by **Devendar**
