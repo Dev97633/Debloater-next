@@ -5,7 +5,7 @@
 <h1 align="center">Debloater-next</h1>
 
 <p align="center">
-  A fast, clean, and modern Android debloater powered by Shizuku — no root required.
+  A safe, open-source Android debloater using Shizuku — no root required.
 </p>
 
 <p align="center">
