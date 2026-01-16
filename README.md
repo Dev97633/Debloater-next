@@ -23,35 +23,14 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Made%20with-Kotlin-orange?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin">
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-blue?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose">
-  <img src="https://img.shields.io/badge/Powered%20by-Shizuku-purple?style=for-the-badge" alt="Shizuku">
 </p>
 
 ## Features
 
 - Real-time search by app name or package
 - Uninstall or disable apps with confirmation dialog
-- Pull-to-refresh to update the list instantly
-- System apps highlighted in a different color
-- Smooth scrolling and modern Material You design (dynamic colors on Android 12+)
 - No root required — uses Shizuku for privileged operations
-- Beautiful onboarding flow + About screen with device specs
-
-## Screenshots
-
-<table>
-  <tr>
-    <td><img src="screenshots/screenshot1.png" width="300"/></td>
-    <td><img src="screenshots/screenshot2.png" width="300"/></td>
-    <td><img src="screenshots/screenshot3.png" width="300"/></td>
-  </tr>
-  <tr>
-    <td>Main list with search</td>
-    <td>Pull-to-refresh</td>
-    <td>About screen</td>
-  </tr>
-</table>
-
-*(Add your own screenshots here later — take them from emulator/device)*
+ 
 
 ## Requirements
 
