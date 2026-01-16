@@ -30,7 +30,21 @@
 - Real-time search by app name or package
 - Uninstall or disable apps with confirmation dialog
 - No root required — uses Shizuku for privileged operations
- 
+
+
+## ⚠️ Important Warning
+**Debloater allows you to uninstall or disable any app on your device, including system apps.**
+
+- **Disabling/uninstalling critical system apps may cause:**
+  - Bootloops
+  - Soft-bricks
+  - Loss of important features (camera, calls, Wi-Fi, etc.)
+  - Need for factory reset or re-flashing firmware
+
+- **You are solely responsible** for any damage or issues caused by using this app.
+- **Always research before disabling/uninstalling any app** — especially ones with system-level permissions.
+- **Use at your own risk** — the developer is not liable for any data loss or device damage.
+  
 
 ## Requirements
 
@@ -62,10 +76,4 @@ cd Debloater
 ## Credits
 
 - **[Shizuku](https://github.com/RikkaApps/Shizuku)** by Rikka — the core engine for privileged operations without root
-- **Jetpack Compose & Material 3** by Google — for the beautiful, responsive, and modern UI with dynamic colors
-- **Coil** — fast and efficient image loading for app icons
-- All other open-source libraries listed in `build.gradle.kts`
-
-Special thanks to the entire Android open-source community ❤️
-
-Developed with ❤️ by **Devendar**
+- Icon from **[Icon Kitchen](https://icon.kitchen)** 
