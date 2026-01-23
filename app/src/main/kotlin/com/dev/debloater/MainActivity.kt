@@ -35,7 +35,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import coil.compose.rememberAsyncImagePainter
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -89,7 +90,7 @@ data class AppData(
     val packageName: String,
     val appName: String,
     val isSystem: Boolean,
-    val icon: Drawable? = null
+    val icon: ImageBitmap? = null
 )
 
 @Composable
@@ -538,7 +539,7 @@ fun AppListItem(
             ) {
                 if (appData.icon != null) {
                     Image(
-                        painter = rememberAsyncImagePainter(appData.icon),
+                        bitmap = appData.icon,
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
                         contentScale = ContentScale.Fit
@@ -651,10 +652,12 @@ private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
                 .mapNotNull { pkg ->
                     val app = pkg.applicationInfo ?: return@mapNotNull null
                     val icon = try {
-                        app.loadIcon(pm)
-                    } catch (e: Exception) {
-                        null
-                    }
+    app.loadIcon(pm)
+        .toBitmap()
+        .asImageBitmap()
+} catch (e: Exception) {
+    null
+}
                     AppData(
                         packageName = pkg.packageName,
                         appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
