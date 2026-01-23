@@ -214,7 +214,11 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         contentPadding = PaddingValues(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(filteredAppData, key = { it.packageName }) { appData ->
+        items(
+              items = filteredAppData,
+              key = { it.packageName },
+              contentType = { "app_item" }
+             ) { appData ->
             AppListItem(
                 appData = appData,
                 onClick = {
@@ -520,14 +524,14 @@ fun AppListItem(
     onDisable: (String) -> Unit,
     onUninstall: (String) -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surface
-    ) {
-        Row(
-            modifier = Modifier
+    Box(
+    modifier = Modifier
+        .fillMaxWidth()
+        .clickable(onClick = onClick)
+        .background(MaterialTheme.colorScheme.surface)
+) {
+   Row(
+           modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
