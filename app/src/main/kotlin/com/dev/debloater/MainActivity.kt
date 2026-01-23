@@ -274,7 +274,7 @@ fun AppListScreen(
         PullToRefreshBox(
             modifier = Modifier.padding(padding),
             isRefreshing = isRefreshing,
-            onRefresh = onRefresh
+            onRefresh = { scope.launch { onRefresh() } }
         ) {
             LazyColumn(
                 state = listState,
