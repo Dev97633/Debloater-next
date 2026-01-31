@@ -110,7 +110,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
-    var confirmUninstall by remember { mutableStateOf<String?>(null) }
+    var confirmAction by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     // Handle system back button
     val backCallback = remember {
@@ -219,12 +219,9 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     selectedApp = appData
                     currentScreen = "details"
                 },
-                onDisable = {
-                    ShizukuManager.disable(appData.packageName)
-                },
-                onUninstall = {
-                    confirmUninstall = appData.packageName
-                }
+                onDisable = { confirmAction = "disable" to app.packageName },
+onUninstall = { confirmAction = "uninstall" to app.packageName }
+
             )
         }
     }
@@ -237,8 +234,12 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                     currentScreen = "apps"
                                     selectedApp = null
                                 },
-                                onDisable = { ShizukuManager.disable(app.packageName) },
-                                onUninstall = { confirmUninstall = app.packageName }
+                                onDisable = {
+    confirmAction = "disable" to appData.packageName
+},
+onUninstall = {
+    confirmAction = "uninstall" to appData.packageName
+}
                             )
                         } ?: Box(Modifier.fillMaxSize())
                         "about" -> AboutScreen()
@@ -246,25 +247,54 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 }
             }
 
-            confirmUninstall?.let { pkg ->
-                AlertDialog(
-                    onDismissRequest = { confirmUninstall = null },
-                    title = { Text("Confirm uninstall") },
-                    text = { Text("Uninstall $pkg ?") },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            scope.launch {
-                                ShizukuManager.uninstall(pkg)
-                                allAppData = allAppData.filter { it.packageName != pkg }
+           confirmAction?.let { (action, pkg) ->
+    AlertDialog(
+        onDismissRequest = { confirmAction = null },
+        title = {
+            Text(
+                if (action == "disable")
+                    "Confirm disable"
+                else
+                    "Confirm uninstall"
+            )
+        },
+        text = {
+            Text(
+                if (action == "disable")
+                    "Disable $pkg ? You can enable it later."
+                else
+                    "Uninstall $pkg ? This cannot be undone."
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    scope.launch {
+                        when (action) {
+                            "disable" -> {
+                                ShizukuManager.disable(pkg)
                             }
-                            confirmUninstall = null
-                        }) { Text("Uninstall") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { confirmUninstall = null }) { Text("Cancel") }
+                            "uninstall" -> {
+                                ShizukuManager.uninstall(pkg)
+                                allAppData = allAppData.filter {
+                                    it.packageName != pkg
+                                }
+                            }
+                        }
                     }
-                )
+                    confirmAction = null
+                }
+            ) {
+                Text(if (action == "disable") "Disable" else "Uninstall")
             }
+        },
+        dismissButton = {
+            TextButton(onClick = { confirmAction = null }) {
+                Text("Cancel")
+            }
+        }
+    )
+}
         }
     }
 }
