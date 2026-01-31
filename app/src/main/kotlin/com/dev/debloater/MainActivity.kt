@@ -219,8 +219,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     selectedApp = appData
                     currentScreen = "details"
                 },
-                onDisable = { confirmAction = "disable" to app.packageName },
-onUninstall = { confirmAction = "uninstall" to app.packageName }
+                onDisable = { confirmAction = "disable" to appData.packageName },
+onUninstall = { confirmAction = "uninstall" to appData.packageName }
 
             )
         }
@@ -235,10 +235,10 @@ onUninstall = { confirmAction = "uninstall" to app.packageName }
                                     selectedApp = null
                                 },
                                 onDisable = {
-    confirmAction = "disable" to appData.packageName
+    confirmAction = "disable" to app.packageName
 },
 onUninstall = {
-    confirmAction = "uninstall" to appData.packageName
+    confirmAction = "uninstall" to app.packageName
 }
                             )
                         } ?: Box(Modifier.fillMaxSize())
