@@ -20,6 +20,10 @@ class DebloaterService : IDebloaterService.Stub() {
         executeShellCommand("pm disable-user --user 0 $packageName")
     }
 
+    override fun enable(packageName: String) {
+    Runtime.getRuntime().exec(arrayOf("pm", "enable", packageName))
+    }
+
     private fun executeShellCommand(command: String) {
         try {
             val process = Runtime.getRuntime().exec("sh")
