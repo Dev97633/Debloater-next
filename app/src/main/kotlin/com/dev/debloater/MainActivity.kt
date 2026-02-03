@@ -89,6 +89,7 @@ data class AppData(
     val packageName: String,
     val appName: String,
     val isSystem: Boolean,
+    val isDisabled: Boolean,
     val icon: Drawable? = null
 )
 
@@ -271,9 +272,8 @@ onUninstall = {
                 onClick = {
                     scope.launch {
                         when (action) {
-                            "disable" -> {
-                                ShizukuManager.disable(pkg)
-                            }
+                            "disable" -> ShizukuManager.disable(pkg)
+                            "enable" -> ShizukuManager.enable(pkg)
                             "uninstall" -> {
                                 ShizukuManager.uninstall(pkg)
                                 allAppData = allAppData.filter {
@@ -640,15 +640,24 @@ fun AppListItem(
                 modifier = Modifier.wrapContentWidth()
             ) {
                 IconButton(
-                    onClick = { onDisable(appData.packageName) },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Block,
-                        contentDescription = "Disable",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.secondary
-                    )
+    onClick = {
+        if (appData.isDisabled)
+            onDisable("enable:${appData.packageName}")
+        else
+            onDisable("disable:${appData.packageName}")
+    },
+    modifier = Modifier.size(36.dp)
+) {
+    Icon(
+        if (appData.isDisabled) Icons.Default.CheckCircle else Icons.Default.Block,
+        contentDescription = if (appData.isDisabled) "Enable" else "Disable",
+        modifier = Modifier.size(18.dp),
+        tint = if (appData.isDisabled)
+            MaterialTheme.colorScheme.primary
+        else
+            MaterialTheme.colorScheme.error
+    )
+}
                 }
                 IconButton(
                     onClick = { onUninstall(appData.packageName) },
@@ -685,14 +694,19 @@ private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
                     } catch (e: Exception) {
                         null
                     }
-                    AppData(
-                        packageName = pkg.packageName,
-                        appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
-                        isSystem = app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
-                                app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
-                        icon = icon
-                    )
-                }
+                    val isDisabled =
+    !app.enabled ||
+    app.enabledSetting == PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+
+AppData(
+    packageName = pkg.packageName,
+    appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
+    isSystem = app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
+            app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
+    isDisabled = isDisabled,
+    icon = icon
+)
+       }
                 .sortedBy { it.appName.lowercase() }
                 .toList()
         } catch (e: Exception) {
