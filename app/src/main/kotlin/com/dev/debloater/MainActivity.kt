@@ -197,61 +197,64 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     label = "screen_transition"
                 ) { screen ->
                     when (screen) {
-                        "apps" -> {
-                            PullToRefreshBox(
-    modifier = Modifier.padding(padding), 
-    isRefreshing = isRefreshing,
-    onRefresh = {
-        scope.launch {
-            isRefreshing = true
-            allAppData = loadAllAppDataWithIcons(pm)
-            isRefreshing = false
+    "apps" -> {
+        PullToRefreshBox(
+            modifier = Modifier.padding(padding),
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                scope.launch {
+                    isRefreshing = true
+                    allAppData = loadAllAppDataWithIcons(pm)
+                    isRefreshing = false
+                }
+            }
+        ) {
+            LazyColumn(
+                contentPadding = PaddingValues(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filteredAppData, key = { it.packageName }) { appData ->
+                    AppListItem(
+                        appData = appData,
+                        onClick = {
+                            selectedApp = appData
+                            currentScreen = "details"
+                        },
+                        onToggle = { pkg, isDisabled ->
+                            confirmAction =
+                                if (isDisabled) "enable" to pkg
+                                else "disable" to pkg
+                        },
+                        onUninstall = { confirmAction = "uninstall" to it }
+                    )
+                }
+            }
         }
     }
-) {
-    LazyColumn(
-        contentPadding = PaddingValues(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(filteredAppData, key = { it.packageName }) { appData ->
-            AppListItem(
-    appData = appData,
-    onClick = {
-        selectedApp = appData
-        currentScreen = "details"
-    },
-    onToggle = { pkg, isDisabled ->
-        confirmAction =
-            if (isDisabled) "enable" to pkg
-            else "disable" to pkg
-    },
-    onUninstall = { confirmAction = "uninstall" to it }
-)
 
-        }
-    }
+    "details" -> selectedApp?.let { app ->
+        AppDetailsScreen(
+            appData = app,
+            onBack = {
+                currentScreen = "apps"
+                selectedApp = null
+            },
+            onDisable = {
+                confirmAction =
+                    if (app.isDisabled) "enable" to app.packageName
+                    else "disable" to app.packageName
+            },
+            onUninstall = {
+                confirmAction = "uninstall" to app.packageName
+            }
+        )
+    } ?: Box(Modifier.fillMaxSize())
+
+    "about" -> AboutScreen()
+
+    else -> Box(Modifier.fillMaxSize()) // ✅ REQUIRED
 }
-                 }
-                        "details" -> selectedApp?.let { app ->
-    AppDetailsScreen(
-        appData = app,
-        onBack = {
-            currentScreen = "apps"
-            selectedApp = null
-        },
-        onDisable = {
-            confirmAction =
-                if (app.isDisabled) "enable" to app.packageName
-                else "disable" to app.packageName
-        },
-        onUninstall = {
-            confirmAction = "uninstall" to app.packageName
-        }
-    )
-}
-                            )
-                        } ?: Box(Modifier.fillMaxSize())
-                        "about" -> AboutScreen()
+
                     }
                 }
             }
