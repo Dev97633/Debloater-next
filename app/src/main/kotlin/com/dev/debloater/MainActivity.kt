@@ -42,6 +42,7 @@ import kotlinx.coroutines.withContext
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import android.content.pm.ApplicationInfo
 
 private const val PREFS_NAME = "DebloaterPrefs"
 private const val KEY_FIRST_LAUNCH = "first_launch"
@@ -689,7 +690,6 @@ fun AppListItem(
             thickness = 0.5.dp
         )
     }
-}
 private suspend fun loadAllAppDataWithIcons(
     pm: PackageManager
 ): List<AppData> = withContext(Dispatchers.Default) {
