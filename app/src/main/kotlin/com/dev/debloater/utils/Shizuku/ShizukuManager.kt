@@ -153,4 +153,20 @@ object ShizukuManager {
             showMessage("Disable failed: ${e.message}", SnackbarDuration.Long)
         }
     }
+
+        fun enable(packageName: String) {
+        if (!isBound || debloaterService == null) {
+            showMessage("Shizuku not connected - retrying...")
+            attemptBind()
+            return
+        }
+
+        try {
+            debloaterService?.enable(packageName)
+            showMessage("Enable command sent: $packageName")
+        } catch (e: Exception) {
+            showMessage("Enable failed: ${e.message}", SnackbarDuration.Long)
+        }
+    }
+
 }
