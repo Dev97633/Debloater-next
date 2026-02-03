@@ -215,19 +215,23 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     ) {
         items(filteredAppData, key = { it.packageName }) { appData ->
             AppListItem(
-                appData = appData,
-                onClick = {
-                    selectedApp = appData
-                    currentScreen = "details"
-                },
-                onDisable = { confirmAction = "disable" to appData.packageName },
-onUninstall = { confirmAction = "uninstall" to appData.packageName }
+    appData = appData,
+    onClick = {
+        selectedApp = appData
+        currentScreen = "details"
+    },
+    onToggle = { pkg, isDisabled ->
+        confirmAction =
+            if (isDisabled) "enable" to pkg
+            else "disable" to pkg
+    },
+    onUninstall = { confirmAction = "uninstall" to it }
+)
 
-            )
         }
     }
 }
-                      }
+                 }
                         "details" -> selectedApp?.let { app ->
                             AppDetailsScreen(
                                 appData = app,
@@ -285,7 +289,14 @@ onUninstall = {
                     confirmAction = null
                 }
             ) {
-                Text(if (action == "disable") "Disable" else "Uninstall")
+                Text(
+    when (action) {
+        "disable" -> "Disable"
+        "enable" -> "Enable"
+        else -> "Uninstall"
+    }
+)
+
             }
         },
         dismissButton = {
@@ -545,7 +556,7 @@ fun DebloaterTopBar(
 fun AppListItem(
     appData: AppData,
     onClick: () -> Unit,
-    onDisable: (String) -> Unit,
+    onToggle: (String, Boolean) -> Unit,
     onUninstall: (String) -> Unit
 ) {
     Surface(
@@ -640,11 +651,8 @@ fun AppListItem(
                 modifier = Modifier.wrapContentWidth()
             ) {
                 IconButton(
-    onClick = {
-        if (appData.isDisabled)
-            onDisable("enable:${appData.packageName}")
-        else
-            onDisable("disable:${appData.packageName}")
+                    onClick = {
+        onToggle(appData.packageName, appData.isDisabled)
     },
     modifier = Modifier.size(36.dp)
 ) {
