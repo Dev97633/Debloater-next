@@ -690,32 +690,39 @@ fun AppListItem(
         )
     }
 }
-private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
-    withContext(Dispatchers.Default) {
-        try {
-            pm.getInstalledPackages(PackageManager.MATCH_ALL)
-                .asSequence()
-                .mapNotNull { pkg ->
-                    val app = pkg.applicationInfo ?: return@mapNotNull null
-                    val icon = try {
-                        app.loadIcon(pm)
-                    } catch (e: Exception) {
-                        null
-                    }
-                    return@mapNotNull AppData(
-    packageName = pkg.packageName,
-    appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
-    isSystem =
-        app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
-        app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
-    isDisabled = !app.enabled,
-    icon = icon
-)
+private suspend fun loadAllAppDataWithIcons(
+    pm: PackageManager
+): List<AppData> = withContext(Dispatchers.Default) {
 
-       }
-                .sortedBy { it.appName.lowercase() }
-                .toList()
-        } catch (e: Exception) {
-            emptyList()
-        }
+    try {
+        pm.getInstalledPackages(PackageManager.MATCH_ALL)
+            .asSequence()
+            .mapNotNull { pkg ->
+                val app = pkg.applicationInfo ?: return@mapNotNull null
+
+                val icon = try {
+                    app.loadIcon(pm)
+                } catch (e: Exception) {
+                    null
+                }
+
+                AppData(
+                    packageName = pkg.packageName,
+                    appName = runCatching {
+                        app.loadLabel(pm).toString()
+                    }.getOrElse { pkg.packageName },
+                    isSystem =
+                        app.flags and ApplicationInfo.FLAG_SYSTEM != 0 ||
+                        app.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
+                    isDisabled = !app.enabled,
+                    icon = icon
+                )
+            }
+            .sortedBy { it.appName.lowercase() }
+            .toList()
+
+    } catch (e: Exception) {
+        emptyList()
     }
+}
+
