@@ -702,18 +702,16 @@ private suspend fun loadAllAppDataWithIcons(pm: PackageManager): List<AppData> =
                     } catch (e: Exception) {
                         null
                     }
-                    val isDisabled =
-    !app.enabled ||
-    app.enabledSetting == PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-
-AppData(
+                    return@mapNotNull AppData(
     packageName = pkg.packageName,
     appName = runCatching { app.loadLabel(pm).toString() }.getOrElse { pkg.packageName },
-    isSystem = app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
-            app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
-    isDisabled = isDisabled,
+    isSystem =
+        app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 ||
+        app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
+    isDisabled = !app.enabled,
     icon = icon
 )
+
        }
                 .sortedBy { it.appName.lowercase() }
                 .toList()
