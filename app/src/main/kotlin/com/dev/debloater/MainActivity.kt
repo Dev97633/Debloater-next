@@ -85,12 +85,11 @@ fun DebloaterTheme(
     MaterialTheme(colorScheme = scheme, content = content)
 }
 
-@Immutable
 data class AppData(
     val packageName: String,
     val appName: String,
     val isSystem: Boolean,
-    val isDisabled: Boolean,
+    var isDisabled: Boolean,
     val icon: Drawable? = null
 )
 
@@ -234,17 +233,21 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
 }
                  }
                         "details" -> selectedApp?.let { app ->
-                            AppDetailsScreen(
-                                appData = app,
-                                onBack = {
-                                    currentScreen = "apps"
-                                    selectedApp = null
-                                },
-                                onDisable = {
-    confirmAction = "disable" to app.packageName
-},
-onUninstall = {
-    confirmAction = "uninstall" to app.packageName
+    AppDetailsScreen(
+        appData = app,
+        onBack = {
+            currentScreen = "apps"
+            selectedApp = null
+        },
+        onDisable = {
+            confirmAction =
+                if (app.isDisabled) "enable" to app.packageName
+                else "disable" to app.packageName
+        },
+        onUninstall = {
+            confirmAction = "uninstall" to app.packageName
+        }
+    )
 }
                             )
                         } ?: Box(Modifier.fillMaxSize())
@@ -277,15 +280,34 @@ onUninstall = {
                 onClick = {
                     scope.launch {
                         when (action) {
-                            "disable" -> ShizukuManager.disable(pkg)
-                            "enable" -> ShizukuManager.enable(pkg)
-                            "uninstall" -> {
-                                ShizukuManager.uninstall(pkg)
-                                allAppData = allAppData.filter {
-                                    it.packageName != pkg
-                                }
-                            }
-                        }
+    "disable" -> {
+        ShizukuManager.disable(pkg)
+        allAppData = allAppData.map {
+            if (it.packageName == pkg)
+                it.copy(isDisabled = true)
+            else it
+        }
+        selectedApp = allAppData.find { it.packageName == pkg }
+    }
+
+    "enable" -> {
+        ShizukuManager.enable(pkg)
+        allAppData = allAppData.map {
+            if (it.packageName == pkg)
+                it.copy(isDisabled = false)
+            else it
+        }
+        selectedApp = allAppData.find { it.packageName == pkg }
+    }
+
+    "uninstall" -> {
+        ShizukuManager.uninstall(pkg)
+        allAppData = allAppData.filter {
+            it.packageName != pkg
+        }
+    }
+}
+
                     }
                     confirmAction = null
                 }
