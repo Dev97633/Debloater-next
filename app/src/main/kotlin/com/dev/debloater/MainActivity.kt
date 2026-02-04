@@ -197,141 +197,137 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     label = "screen_transition"
                 ) { screen ->
                     when (screen) {
-    "apps" -> {
-        PullToRefreshBox(
-            modifier = Modifier.padding(padding),
-            isRefreshing = isRefreshing,
-            onRefresh = {
-                scope.launch {
-                    isRefreshing = true
-                    allAppData = loadAllAppDataWithIcons(pm)
-                    isRefreshing = false
-                }
-            }
-        ) {
-            LazyColumn(
-                contentPadding = PaddingValues(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(filteredAppData, key = { it.packageName }) { appData ->
-                    AppListItem(
-                        appData = appData,
-                        onClick = {
-                            selectedApp = appData
-                            currentScreen = "details"
-                        },
-                        onToggle = { pkg, isDisabled ->
-                            confirmAction =
-                                if (isDisabled) "enable" to pkg
-                                else "disable" to pkg
-                        },
-                        onUninstall = { confirmAction = "uninstall" to it }
-                    )
-                }
-            }
-        }
-    }
+                        "apps" -> {
+                            PullToRefreshBox(
+                                modifier = Modifier.padding(padding),
+                                isRefreshing = isRefreshing,
+                                onRefresh = {
+                                    scope.launch {
+                                        isRefreshing = true
+                                        allAppData = loadAllAppDataWithIcons(pm)
+                                        isRefreshing = false
+                                    }
+                                }
+                            ) {
+                                LazyColumn(
+                                    contentPadding = PaddingValues(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(filteredAppData, key = { it.packageName }) { appData ->
+                                        AppListItem(
+                                            appData = appData,
+                                            onClick = {
+                                                selectedApp = appData
+                                                currentScreen = "details"
+                                            },
+                                            onToggle = { pkg, isDisabled ->
+                                                confirmAction =
+                                                    if (isDisabled) "enable" to pkg
+                                                    else "disable" to pkg
+                                            },
+                                            onUninstall = { confirmAction = "uninstall" to it }
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
-    "details" -> selectedApp?.let { app ->
-        AppDetailsScreen(
-            appData = app,
-            onBack = {
-                currentScreen = "apps"
-                selectedApp = null
-            },
-            onDisable = {
-                confirmAction =
-                    if (app.isDisabled) "enable" to app.packageName
-                    else "disable" to app.packageName
-            },
-            onUninstall = {
-                confirmAction = "uninstall" to app.packageName
-            }
-        )
-    } ?: Box(Modifier.fillMaxSize())
+                        "details" -> selectedApp?.let { app ->
+                            AppDetailsScreen(
+                                appData = app,
+                                onBack = {
+                                    currentScreen = "apps"
+                                    selectedApp = null
+                                },
+                                onDisable = {
+                                    confirmAction =
+                                        if (app.isDisabled) "enable" to app.packageName
+                                        else "disable" to app.packageName
+                                },
+                                onUninstall = {
+                                    confirmAction = "uninstall" to app.packageName
+                                }
+                            )
+                        } ?: Box(Modifier.fillMaxSize())
 
-    "about" -> AboutScreen()
+                        "about" -> AboutScreen()
 
-    else -> Box(Modifier.fillMaxSize()) // ✅ REQUIRED
-}
-
+                        else -> Box(Modifier.fillMaxSize()) // ✅ REQUIRED
                     }
                 }
             }
 
-           confirmAction?.let { (action, pkg) ->
-    AlertDialog(
-        onDismissRequest = { confirmAction = null },
-        title = {
-            Text(
-                if (action == "disable")
-                    "Confirm disable"
-                else
-                    "Confirm uninstall"
-            )
-        },
-        text = {
-            Text(
-                if (action == "disable")
-                    "Disable $pkg ? You can enable it later."
-                else
-                    "Uninstall $pkg ? This cannot be undone."
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    scope.launch {
-                        when (action) {
-    "disable" -> {
-        ShizukuManager.disable(pkg)
-        allAppData = allAppData.map {
-            if (it.packageName == pkg)
-                it.copy(isDisabled = true)
-            else it
-        }
-        selectedApp = allAppData.find { it.packageName == pkg }
-    }
+            confirmAction?.let { (action, pkg) ->
+                AlertDialog(
+                    onDismissRequest = { confirmAction = null },
+                    title = {
+                        Text(
+                            if (action == "disable")
+                                "Confirm disable"
+                            else
+                                "Confirm uninstall"
+                        )
+                    },
+                    text = {
+                        Text(
+                            if (action == "disable")
+                                "Disable $pkg ? You can enable it later."
+                            else
+                                "Uninstall $pkg ? This cannot be undone."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    when (action) {
+                                        "disable" -> {
+                                            ShizukuManager.disable(pkg)
+                                            allAppData = allAppData.map {
+                                                if (it.packageName == pkg)
+                                                    it.copy(isDisabled = true)
+                                                else it
+                                            }
+                                            selectedApp = allAppData.find { it.packageName == pkg }
+                                        }
 
-    "enable" -> {
-        ShizukuManager.enable(pkg)
-        allAppData = allAppData.map {
-            if (it.packageName == pkg)
-                it.copy(isDisabled = false)
-            else it
-        }
-        selectedApp = allAppData.find { it.packageName == pkg }
-    }
+                                        "enable" -> {
+                                            ShizukuManager.enable(pkg)
+                                            allAppData = allAppData.map {
+                                                if (it.packageName == pkg)
+                                                    it.copy(isDisabled = false)
+                                                else it
+                                            }
+                                            selectedApp = allAppData.find { it.packageName == pkg }
+                                        }
 
-    "uninstall" -> {
-        ShizukuManager.uninstall(pkg)
-        allAppData = allAppData.filter {
-            it.packageName != pkg
-        }
-    }
-}
-
+                                        "uninstall" -> {
+                                            ShizukuManager.uninstall(pkg)
+                                            allAppData = allAppData.filter {
+                                                it.packageName != pkg
+                                            }
+                                        }
+                                    }
+                                }
+                                confirmAction = null
+                            }
+                        ) {
+                            Text(
+                                when (action) {
+                                    "disable" -> "Disable"
+                                    "enable" -> "Enable"
+                                    else -> "Uninstall"
+                                }
+                            )
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { confirmAction = null }) {
+                            Text("Cancel")
+                        }
                     }
-                    confirmAction = null
-                }
-            ) {
-                Text(
-    when (action) {
-        "disable" -> "Disable"
-        "enable" -> "Enable"
-        else -> "Uninstall"
-    }
-)
-
+                )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = { confirmAction = null }) {
-                Text("Cancel")
-            }
-        }
-    )
-}
         }
     }
 }
@@ -750,4 +746,3 @@ private suspend fun loadAllAppDataWithIcons(
         emptyList()
     }
 }
-
