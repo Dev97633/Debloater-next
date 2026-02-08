@@ -15,6 +15,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -114,6 +116,25 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmAction by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val listState = rememberLazyListState()
+
+    val alphabet = remember { ('A'..'Z').map { it.toString() } + "#" }
+    val letterIndexMap by remember(filteredAppData) {
+        derivedStateOf {
+            filteredAppData
+                .mapIndexedNotNull { index, app ->
+                    val firstChar = app.appName.firstOrNull()?.uppercaseChar()
+                    val letter = if (firstChar != null && firstChar.isLetter()) {
+                        firstChar.toString()
+                    } else {
+                        "#"
+                    }
+                    letter to index
+                }
+                .distinctBy { it.first }
+                .toMap()
+        }
+    }
 
     // Handle system back button
     val backCallback = remember {
@@ -211,28 +232,65 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                     }
                                 }
                             ) {
-                                LazyColumn(
-                                    contentPadding = PaddingValues(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    items(
-                                        items = filteredAppData,
-                                        key = { it.packageName },
-                                        contentType = { "app_item" }
-                                    ) { appData ->
-                                        AppListItem(
-                                            appData = appData,
-                                            onClick = {
-                                                selectedApp = appData
-                                                currentScreen = "details"
-                                            },
-                                            onToggle = { pkg, isDisabled ->
-                                                confirmAction =
-                                                    if (isDisabled) "enable" to pkg
-                                                    else "disable" to pkg
-                                            },
-                                            onUninstall = { confirmAction = "uninstall" to it }
-                                        )
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    LazyColumn(
+                                        state = listState,
+                                        contentPadding = PaddingValues(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        items(
+                                            items = filteredAppData,
+                                            key = { it.packageName },
+                                            contentType = { "app_item" }
+                                        ) { appData ->
+                                            AppListItem(
+                                                appData = appData,
+                                                onClick = {
+                                                    selectedApp = appData
+                                                    currentScreen = "details"
+                                                },
+                                                onToggle = { pkg, isDisabled ->
+                                                    confirmAction =
+                                                        if (isDisabled) "enable" to pkg
+                                                        else "disable" to pkg
+                                                },
+                                                onUninstall = { confirmAction = "uninstall" to it }
+                                            )
+                                        }
+                                    }
+
+                                    Column(
+                                        modifier = Modifier
+                                            .align(Alignment.CenterEnd)
+                                            .padding(end = 6.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.75f))
+                                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        alphabet.forEach { letter ->
+                                            val hasSection = letterIndexMap.containsKey(letter)
+                                            Text(
+                                                text = letter,
+                                                fontWeight = if (hasSection) FontWeight.SemiBold else FontWeight.Normal,
+                                                color = if (hasSection) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                },
+                                                modifier = Modifier
+                                                    .clip(CircleShape)
+                                                    .clickable(enabled = hasSection) {
+                                                        val targetIndex = letterIndexMap[letter] ?: return@clickable
+                                                        scope.launch {
+                                                            listState.animateScrollToItem(targetIndex)
+                                                        }
+                                                    }
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
                                     }
                                 }
                             }
