@@ -14,10 +14,12 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
@@ -114,6 +116,9 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmAction by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val appListState = rememberLazyListState()
+    val suggestionListState = rememberLazyListState()
+    val smoothFlingBehavior = ScrollableDefaults.flingBehavior()
 
     // Handle system back button
     val backCallback = remember {
@@ -212,8 +217,10 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                 }
                             ) {
                                 LazyColumn(
+                                    state = appListState,
                                     contentPadding = PaddingValues(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    flingBehavior = smoothFlingBehavior
                                 ) {
                                     items(
                                         items = filteredAppData,
@@ -566,7 +573,10 @@ fun DebloaterTopBar(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                LazyColumn {
+                LazyColumn(
+                    state = suggestionListState,
+                    flingBehavior = smoothFlingBehavior
+                ) {
                     items(suggestions, key = { it.packageName }) { appData ->
                         ListItem(
                             headlineContent = { Text(appData.appName) },
