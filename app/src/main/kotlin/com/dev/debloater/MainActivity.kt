@@ -262,18 +262,20 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     onDismissRequest = { confirmAction = null },
                     title = {
                         Text(
-                            if (action == "disable")
-                                "Confirm disable"
-                            else
-                                "Confirm uninstall"
+                            when (action) {
+                                "disable" -> "Confirm disable"
+                                "enable" -> "Confirm enable"
+                                else -> "Confirm uninstall"
+                            }
                         )
                     },
                     text = {
                         Text(
-                            if (action == "disable")
-                                "Disable $pkg ? You can enable it later."
-                            else
-                                "Uninstall $pkg ? This cannot be undone."
+                            when (action) {
+                                "disable" -> "Disable $pkg ? You can enable it later."
+                                "enable" -> "Enable $pkg ?"
+                                else -> "Uninstall $pkg ? This cannot be undone."
+                            }
                         )
                     },
                     confirmButton = {
