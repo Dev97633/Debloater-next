@@ -25,7 +25,8 @@ fun AppDetailsScreen(
     appData: AppData,
     onBack: () -> Unit,
     onDisable: () -> Unit,
-    onUninstall: () -> Unit
+    onUninstall: () -> Unit,
+    onRestore: () -> Unit
 ) {
     val context = LocalContext.current
     val pm = context.packageManager
@@ -43,6 +44,7 @@ fun AppDetailsScreen(
 
     var isDisabling by remember { mutableStateOf(false) }
     var isUninstalling by remember { mutableStateOf(false) }
+    var isRestoring by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -116,45 +118,71 @@ fun AppDetailsScreen(
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium
                     )
+                    Spacer(Modifier.height(12.dp))
+                    Text("Install Status", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = if (appData.isInstalled) "Installed" else "Uninstalled",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = if (appData.isInstalled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
+                    )
                 }
             }
 
             Spacer(Modifier.height(48.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        isDisabling = true
-                        onDisable()
-                        isDisabling = false
-                    },
-                    enabled = !isDisabling && !isUninstalling,
-                    modifier = Modifier.weight(1f)
+            if (appData.isInstalled) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    if (isDisabling) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            isDisabling = true
+                            onDisable()
+                            isDisabling = false
+                        },
+                        enabled = !isDisabling && !isUninstalling,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (isDisabling) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(if (appData.isDisabled) "Enable" else "Disable")
                     }
-                    Text(if (appData.isDisabled) "Enable" else "Disable")
+                    Button(
+                        onClick = {
+                            isUninstalling = true
+                            onUninstall()
+                            isUninstalling = false
+                        },
+                        enabled = !isDisabling && !isUninstalling,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (isUninstalling) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text("Uninstall")
+                    }
                 }
+            } else {
 
                 Button(
                     onClick = {
-                        isUninstalling = true
-                        onUninstall()
-                        isUninstalling = false
+                        isRestoring = true
+                        onRestore()
+                        isRestoring = false
                     },
-                    enabled = !isDisabling && !isUninstalling,
-                    modifier = Modifier.weight(1f)
+                    enabled = !isRestoring,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    if (isUninstalling) {
+                    if (isRestoring) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                         Spacer(Modifier.width(8.dp))
                     }
-                    Text("Uninstall")
+                    Text("Restore")
                 }
             }
         }
