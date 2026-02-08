@@ -792,25 +792,31 @@ private suspend fun loadAllAppDataWithIcons(
     try {
         pm.getInstalledPackages(PackageManager.MATCH_ALL or PackageManager.MATCH_UNINSTALLED_PACKAGES)
             .asSequence()
-            .mapNotNull { pkg ->
-                val app = pkg.applicationInfo ?: return@mapNotNull null
-                val isInstalled = app.flags and ApplicationInfo.FLAG_INSTALLED != 0
-
-                val icon = try {
-                    app.loadIcon(pm).toBitmap().asImageBitmap()
-                } catch (e: Exception) {
-                    null
+            .map { pkg ->
+                val appInfo = pkg.applicationInfo ?: runCatching {
+                    pm.getApplicationInfo(
+                        pkg.packageName,
+                        PackageManager.MATCH_UNINSTALLED_PACKAGES or PackageManager.MATCH_DISABLED_COMPONENTS
+                    )
+                }.getOrNull()
+                val isInstalled = appInfo?.flags
+                    ?.and(ApplicationInfo.FLAG_INSTALLED)
+                    ?.let { it != 0 }
+                    ?: false
+                val icon = appInfo?.let {
+                    runCatching { it.loadIcon(pm).toBitmap().asImageBitmap() }.getOrNull()
                 }
 
                 AppData(
                     packageName = pkg.packageName,
-                    appName = runCatching {
-                        app.loadLabel(pm).toString()
-                    }.getOrElse { pkg.packageName },
-                    isSystem =
-                        app.flags and ApplicationInfo.FLAG_SYSTEM != 0 ||
-                        app.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
-                    isDisabled = !app.enabled,
+                    appName = appInfo?.let {
+                        runCatching { it.loadLabel(pm).toString() }.getOrNull()
+                    } ?: pkg.packageName,
+                    isSystem = appInfo?.let {
+                        it.flags and ApplicationInfo.FLAG_SYSTEM != 0 ||
+                            it.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
+                    } ?: false,
+                    isDisabled = appInfo?.enabled == false,
                     isInstalled = isInstalled,
                     icon = icon
                 )
