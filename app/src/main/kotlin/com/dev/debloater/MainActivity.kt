@@ -4,7 +4,7 @@ package com.dev.debloater
 
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.drawable.Drawable
+import androidx.core.graphics.drawable.toBitmap
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -27,6 +27,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -35,7 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import coil.compose.rememberAsyncImagePainter
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -90,7 +92,7 @@ data class AppData(
     val appName: String,
     val isSystem: Boolean,
     var isDisabled: Boolean,
-    val icon: Drawable? = null
+    val icon: ImageBitmap? = null
 )
 
 @Composable
@@ -213,7 +215,11 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                     contentPadding = PaddingValues(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    items(filteredAppData, key = { it.packageName }) { appData ->
+                                    items(
+                                        items = filteredAppData,
+                                        key = { it.packageName },
+                                        contentType = { "app_item" }
+                                    ) { appData ->
                                         AppListItem(
                                             appData = appData,
                                             onClick = {
@@ -603,7 +609,7 @@ fun AppListItem(
             ) {
                 if (appData.icon != null) {
                     Image(
-                        painter = rememberAsyncImagePainter(appData.icon),
+                        bitmap = appData.icon,
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
                         contentScale = ContentScale.Fit
@@ -724,7 +730,7 @@ private suspend fun loadAllAppDataWithIcons(
                 val app = pkg.applicationInfo ?: return@mapNotNull null
 
                 val icon = try {
-                    app.loadIcon(pm)
+                    app.loadIcon(pm).toBitmap().asImageBitmap()
                 } catch (e: Exception) {
                     null
                 }
