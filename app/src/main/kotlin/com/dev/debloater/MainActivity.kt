@@ -784,6 +784,7 @@ fun AppListItem(
             thickness = 0.5.dp
         )
     }
+}
 private suspend fun loadAllAppDataWithIcons(
     pm: PackageManager
 ): List<AppData> = withContext(Dispatchers.Default) {
