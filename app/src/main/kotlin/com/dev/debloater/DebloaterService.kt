@@ -16,6 +16,10 @@ class DebloaterService : IDebloaterService.Stub() {
         executeShellCommand("pm uninstall --user 0 $packageName")
     }
 
+    override fun restore(packageName: String) {
+        executeShellCommand("pm install-existing --user 0 $packageName")
+    }
+
     override fun disable(packageName: String) {
         executeShellCommand("pm disable-user --user 0 $packageName")
     }
