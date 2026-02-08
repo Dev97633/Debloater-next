@@ -138,7 +138,7 @@ fun AppDetailsScreen(
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(8.dp))
                     }
-                    Text("Disable")
+                    Text(if (appData.isDisabled) "Enable" else "Disable")
                 }
 
                 Button(
