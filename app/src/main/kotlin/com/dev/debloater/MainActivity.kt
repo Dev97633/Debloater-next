@@ -119,23 +119,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val listState = rememberLazyListState()
 
     val alphabet = remember { ('A'..'Z').map { it.toString() } + "#" }
-    val letterIndexMap by remember(filteredAppData) {
-        derivedStateOf {
-            filteredAppData
-                .mapIndexedNotNull { index, app ->
-                    val firstChar = app.appName.firstOrNull()?.uppercaseChar()
-                    val letter = if (firstChar != null && firstChar.isLetter()) {
-                        firstChar.toString()
-                    } else {
-                        "#"
-                    }
-                    letter to index
-                }
-                .distinctBy { it.first }
-                .toMap()
-        }
-    }
-
+    
     // Handle system back button
     val backCallback = remember {
         object : OnBackPressedCallback(true) {
@@ -173,6 +157,22 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 it.appName.contains(query, ignoreCase = true) ||
                 it.packageName.contains(query, ignoreCase = true)
             }
+        }
+    }
+    val letterIndexMap by remember(filteredAppData) {
+        derivedStateOf {
+            filteredAppData
+                .mapIndexedNotNull { index, app ->
+                    val firstChar = app.appName.firstOrNull()?.uppercaseChar()
+                    val letter = if (firstChar != null && firstChar.isLetter()) {
+                        firstChar.toString()
+                    } else {
+                        "#"
+                    }
+                    letter to index
+                }
+                .distinctBy { it.first }
+                .toMap()
         }
     }
 
@@ -429,9 +429,10 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                         if (currentStep < 2) {
                             currentStep++
                         } else {
-             ShizukuManager.requestPermissionAndBind()
-             onComplete()
-                       }
+                            ShizukuManager.requestPermissionAndBind()
+                            onComplete()
+                        }
+                   
                     },
                     enabled = if (currentStep == 1) hasConfirmedWarning else true
                 ) {
@@ -740,20 +741,19 @@ fun AppListItem(
             ) {
                 IconButton(
                     onClick = {
-        onToggle(appData.packageName, appData.isDisabled)
-    },
-    modifier = Modifier.size(36.dp)
-) {
-    Icon(
-        if (appData.isDisabled) Icons.Default.CheckCircle else Icons.Default.Block,
-        contentDescription = if (appData.isDisabled) "Enable" else "Disable",
-        modifier = Modifier.size(18.dp),
-        tint = if (appData.isDisabled)
-            MaterialTheme.colorScheme.primary
-        else
-            MaterialTheme.colorScheme.error
-    )
-}
+                        onToggle(appData.packageName, appData.isDisabled)
+                    },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        if (appData.isDisabled) Icons.Default.CheckCircle else Icons.Default.Block,
+                        contentDescription = if (appData.isDisabled) "Enable" else "Disable",
+                        modifier = Modifier.size(18.dp),
+                        tint = if (appData.isDisabled)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.error
+                    )
                 }
                 IconButton(
                     onClick = { onUninstall(appData.packageName) },
@@ -776,6 +776,7 @@ fun AppListItem(
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
             thickness = 0.5.dp
         )
+    }
     }
 private suspend fun loadAllAppDataWithIcons(
     pm: PackageManager
