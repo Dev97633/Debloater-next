@@ -20,6 +20,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
@@ -39,7 +46,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -119,6 +125,11 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val listState = rememberLazyListState()
 
     val alphabet = remember { ('A'..'Z').map { it.toString() } + "#" }
+    val density = LocalDensity.current
+    val fastScrollThumbHeight = 56.dp
+    val fastScrollThumbHeightPx = with(density) { fastScrollThumbHeight.roundToPx() }
+    var fastScrollTrackHeightPx by remember { mutableStateOf(0) }
+    var fastScrollOffsetPx by remember { mutableStateOf<Float?>(null) }
     
     // Handle system back button
     val backCallback = remember {
@@ -175,6 +186,17 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 .toMap()
         }
     }
+    val totalItems = filteredAppData.size
+    val maxIndex = (totalItems - 1).coerceAtLeast(0)
+    val defaultThumbOffsetPx = if (maxIndex == 0 || fastScrollTrackHeightPx == 0) {
+        0f
+    } else {
+        val fraction = listState.firstVisibleItemIndex / maxIndex.toFloat()
+        val available = fastScrollTrackHeightPx - fastScrollThumbHeightPx
+        fraction * available.coerceAtLeast(0)
+    }
+    val thumbOffsetPx = fastScrollOffsetPx ?: defaultThumbOffsetPx
+
 
     if (currentScreen == "onboarding") {
         OnboardingScreen {
@@ -291,6 +313,290 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                                 textAlign = TextAlign.Center
                                             )
                                         }
+                                    }
+                                    @file:OptIn(ExperimentalMaterial3Api::class)
+
+package com.dev.debloater
+
+import android.content.Context
+import android.content.pm.PackageManager
+import androidx.core.graphics.drawable.toBitmap
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.setContent
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import android.content.pm.ApplicationInfo
+import kotlin.math.roundToInt
+
+private const val PREFS_NAME = "DebloaterPrefs"
+private const val KEY_FIRST_LAUNCH = "first_launch"
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        ShizukuManager.init(this)
+        setContent {
+            DebloaterTheme {
+                val snackbarHostState = remember { SnackbarHostState() }
+                LaunchedEffect(Unit) {
+                    ShizukuManager.setSnackbarHostState(snackbarHostState)
+                }
+                DebloaterScreen(snackbarHostState)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        ShizukuManager.cleanup()
+        super.onDestroy()
+    }
+}
+
+@@ -97,106 +104,121 @@ data class AppData(
+    val icon: ImageBitmap? = null
+)
+
+@Composable
+fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
+    val context = LocalContext.current
+    val activity = (LocalContext.current as ComponentActivity)
+    val pm = context.packageManager
+    val scope = rememberCoroutineScope()
+
+    // First launch check
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    var isFirstLaunch by remember { mutableStateOf(prefs.getBoolean(KEY_FIRST_LAUNCH, true)) }
+
+    var currentScreen by rememberSaveable { mutableStateOf(if (isFirstLaunch) "onboarding" else "apps") }
+    var selectedApp by remember { mutableStateOf<AppData?>(null) }
+
+    var allAppData by remember { mutableStateOf<List<AppData>>(emptyList()) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var active by rememberSaveable { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var confirmAction by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val listState = rememberLazyListState()
+
+    val alphabet = remember { ('A'..'Z').map { it.toString() } + "#" }
+    val letterIndexMap by remember(filteredAppData) {
+        derivedStateOf {
+            filteredAppData
+                .mapIndexedNotNull { index, app ->
+                    val firstChar = app.appName.firstOrNull()?.uppercaseChar()
+                    val letter = if (firstChar != null && firstChar.isLetter()) {
+                        firstChar.toString()
+                    } else {
+                        "#"
+                    }
+                    letter to index
+                }
+                .distinctBy { it.first }
+                .toMap()
+        }
+    }
+    val density = LocalDensity.current
+    val fastScrollThumbHeight = 56.dp
+    val fastScrollThumbHeightPx = with(density) { fastScrollThumbHeight.roundToPx() }
+    var fastScrollTrackHeightPx by remember { mutableStateOf(0) }
+    var fastScrollOffsetPx by remember { mutableStateOf<Float?>(null) }
+
+    // Handle system back button
+    val backCallback = remember {
+        object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (currentScreen == "onboarding") {
+                    isEnabled = false
+                    activity.onBackPressed()
+                } else if (currentScreen != "apps") {
+                    currentScreen = "apps"
+                    selectedApp = null
+                } else {
+                    isEnabled = false
+                    activity.onBackPressed()
+                }
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        activity.onBackPressedDispatcher.addCallback(backCallback)
+        onDispose { backCallback.remove() }
+    }
+
+    // Load apps only after onboarding
+    LaunchedEffect(currentScreen) {
+        if (currentScreen == "apps" && allAppData.isEmpty()) {
+            allAppData = loadAllAppDataWithIcons(pm)
+        }
+    }
+
+    val filteredAppData by remember {
+        derivedStateOf {
+            if (query.isBlank()) allAppData
+            else allAppData.filter {
+                it.appName.contains(query, ignoreCase = true) ||
+                it.packageName.contains(query, ignoreCase = true)
+            }
+        }
+    }
+    val letterIndexMap by remember(filteredAppData) {
+        derivedStateOf {
+            filteredAppData
+                .mapIndexedNotNull { index, app ->
+                    val firstChar = app.appName.firstOrNull()?.uppercaseChar()
+                    val letter = if (firstChar != null && firstChar.isLetter()) {
+                        firstChar.toString()
+                    } else {
+                        "#"
+                    }
+                    letter to index
+                }
+                .distinctBy { it.first }
+                .toMap()
+        }
+    }
+    val totalItems = filteredAppData.size
+    val maxIndex = (totalItems - 1).coerceAtLeast(0)
+    val defaultThumbOffsetPx = if (maxIndex == 0 || fastScrollTrackHeightPx == 0) {
+        0f
+    } else {
+        val fraction = listState.firstVisibleItemIndex / maxIndex.toFloat()
+        val available = fastScrollTrackHeightPx - fastScrollThumbHeightPx
+        fraction * available.coerceAtLeast(0)
+    }
+    val thumbOffsetPx = fastScrollOffsetPx ?: defaultThumbOffsetPx
+
+    if (currentScreen == "onboarding") {
+        OnboardingScreen {
+            prefs.edit().putBoolean(KEY_FIRST_LAUNCH, false).apply()
+            currentScreen = "apps"
+        }
+    } else {
+        Scaffold(
+            topBar = {
+                DebloaterTopBar(
+                    query = query,
+                    active = active,
+                    onQueryChange = { query = it },
+                    onActiveChange = { active = it },
+                    suggestions = filteredAppData.take(10),
+                    onSuggestionClick = { query = it; active = false },
+                    currentScreen = currentScreen,
+                    onNavigate = { currentScreen = it },
+                    onBack = {
+                        currentScreen = "apps"
+                        selectedApp = null
+                    }
+                )
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) }
+@@ -270,50 +292,89 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        alphabet.forEach { letter ->
+                                            val hasSection = letterIndexMap.containsKey(letter)
+                                            Text(
+                                                text = letter,
+                                                fontWeight = if (hasSection) FontWeight.SemiBold else FontWeight.Normal,
+                                                color = if (hasSection) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                },
+                                                modifier = Modifier
+                                                    .clip(CircleShape)
+                                                    .clickable(enabled = hasSection) {
+                                                        val targetIndex = letterIndexMap[letter] ?: return@clickable
+                                                        scope.launch {
+                                                            listState.animateScrollToItem(targetIndex)
+                                                        }
+                                                    }
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.CenterEnd)
+                                            .padding(end = 2.dp)
+                                            .width(18.dp)
+                                            .fillMaxHeight()
+                                            .onSizeChanged { fastScrollTrackHeightPx = it.height }
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .offset { IntOffset(0, thumbOffsetPx.roundToInt()) }
+                                                .padding(horizontal = 4.dp)
+                                                .fillMaxWidth()
+                                                .height(fastScrollThumbHeight)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                                                .draggable(
+                                                    orientation = Orientation.Vertical,
+                                                    state = rememberDraggableState { delta ->
+                                                        if (maxIndex == 0 || fastScrollTrackHeightPx == 0) return@rememberDraggableState
+                                                        val available =
+                                                            (fastScrollTrackHeightPx - fastScrollThumbHeightPx)
+                                                                .coerceAtLeast(0)
+                                                        val nextOffset = (thumbOffsetPx + delta)
+                                                            .coerceIn(0f, available.toFloat())
+                                                        fastScrollOffsetPx = nextOffset
+                                                        val fraction = if (available == 0) 0f else nextOffset / available
+                                                        val targetIndex = (fraction * maxIndex).roundToInt()
+                                                        scope.launch {
+                                                            listState.scrollToItem(targetIndex)
+                                                        }
+                                                    },
+                                                    onDragStopped = {
+                                                        fastScrollOffsetPx = null
+                                                    }
+                                                )
+                                        )
                                     }
                                 }
                             }
@@ -429,10 +735,9 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                         if (currentStep < 2) {
                             currentStep++
                         } else {
-                            ShizukuManager.requestPermissionAndBind()
+                        ShizukuManager.requestPermissionAndBind()
                             onComplete()
                         }
-                   
                     },
                     enabled = if (currentStep == 1) hasConfirmedWarning else true
                 ) {
