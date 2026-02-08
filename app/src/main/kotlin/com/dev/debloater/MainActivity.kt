@@ -14,10 +14,12 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.clickable
@@ -175,6 +177,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     onActiveChange = { active = it },
                     suggestions = filteredAppData.take(10),
                     onSuggestionClick = { query = it; active = false },
+                    suggestionListState = suggestionListState,
+                    smoothFlingBehavior = smoothFlingBehavior,
                     currentScreen = currentScreen,
                     onNavigate = { currentScreen = it },
                     onBack = {
@@ -509,6 +513,8 @@ fun DebloaterTopBar(
     onActiveChange: (Boolean) -> Unit,
     suggestions: List<AppData>,
     onSuggestionClick: (String) -> Unit,
+    suggestionListState: LazyListState,
+    smoothFlingBehavior: FlingBehavior,
     currentScreen: String,
     onNavigate: (String) -> Unit,
     onBack: () -> Unit
