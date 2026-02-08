@@ -27,9 +27,10 @@
 
 ## Features
 
-- Real-time search by app name or package
 - Uninstall or disable apps with confirmation dialog
 - No root required — uses Shizuku for privileged operations
+- Easy to restore uninstalled and Disable apps
+- easy to find current app status 
 
 
 ## ⚠️ Important Warning
