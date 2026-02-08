@@ -138,6 +138,21 @@ object ShizukuManager {
             showMessage("Uninstall failed: ${e.message}", SnackbarDuration.Long)
         }
     }
+    
+    fun restore(packageName: String) {
+        if (!isBound || debloaterService == null) {
+            showMessage("Shizuku not connected - retrying...")
+            attemptBind()
+            return
+        }
+
+        try {
+            debloaterService?.restore(packageName)
+            showMessage("Restore command sent: $packageName")
+        } catch (e: Exception) {
+            showMessage("Restore failed: ${e.message}", SnackbarDuration.Long)
+        }
+    }
 
     fun disable(packageName: String) {
         if (!isBound || debloaterService == null) {
