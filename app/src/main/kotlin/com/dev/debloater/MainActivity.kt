@@ -16,6 +16,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,10 +35,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -47,6 +53,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import android.content.pm.ApplicationInfo
+import kotlin.math.roundToInt
 
 private const val PREFS_NAME = "DebloaterPrefs"
 private const val KEY_FIRST_LAUNCH = "first_launch"
@@ -119,22 +126,12 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val listState = rememberLazyListState()
 
     val alphabet = remember { ('A'..'Z').map { it.toString() } + "#" }
-    val letterIndexMap by remember(filteredAppData) {
-        derivedStateOf {
-            filteredAppData
-                .mapIndexedNotNull { index, app ->
-                    val firstChar = app.appName.firstOrNull()?.uppercaseChar()
-                    val letter = if (firstChar != null && firstChar.isLetter()) {
-                        firstChar.toString()
-                    } else {
-                        "#"
-                    }
-                    letter to index
-                }
-                .distinctBy { it.first }
-                .toMap()
-        }
-    }
+    val density = LocalDensity.current
+    val fastScrollThumbHeight = 56.dp
+    val fastScrollThumbHeightPx = with(density) { fastScrollThumbHeight.roundToPx() }
+    var fastScrollTrackHeightPx by remember { mutableStateOf(0) }
+    var fastScrollOffsetPx by remember { mutableStateOf<Float?>(null) }
+    var fastScrollTargetIndex by remember { mutableStateOf<Int?>(null) }
 
     // Handle system back button
     val backCallback = remember {
@@ -175,6 +172,32 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
             }
         }
     }
+    val letterIndexMap by remember(filteredAppData) {
+        derivedStateOf {
+            filteredAppData
+                .mapIndexedNotNull { index, app ->
+                    val firstChar = app.appName.firstOrNull()?.uppercaseChar()
+                    val letter = if (firstChar != null && firstChar.isLetter()) {
+                        firstChar.toString()
+                    } else {
+                        "#"
+                    }
+                    letter to index
+                }
+                .distinctBy { it.first }
+                .toMap()
+        }
+    }
+    val totalItems = filteredAppData.size
+    val maxIndex = (totalItems - 1).coerceAtLeast(0)
+    val defaultThumbOffsetPx = if (maxIndex == 0 || fastScrollTrackHeightPx == 0) {
+        0f
+    } else {
+        val fraction = listState.firstVisibleItemIndex / maxIndex.toFloat()
+        val available = fastScrollTrackHeightPx - fastScrollThumbHeightPx
+        fraction * available.coerceAtLeast(0)
+    }
+    val thumbOffsetPx = fastScrollOffsetPx ?: defaultThumbOffsetPx
 
     if (currentScreen == "onboarding") {
         OnboardingScreen {
@@ -291,6 +314,52 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                                 textAlign = TextAlign.Center
                                             )
                                         }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.CenterEnd)
+                                            .padding(end = 2.dp)
+                                            .width(18.dp)
+                                            .fillMaxHeight()
+                                            .onSizeChanged { fastScrollTrackHeightPx = it.height }
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .offset { IntOffset(0, thumbOffsetPx.roundToInt()) }
+                                                .padding(horizontal = 4.dp)
+                                                .fillMaxWidth()
+                                                .height(fastScrollThumbHeight)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                                                .draggable(
+                                                    orientation = Orientation.Vertical,
+                                                    state = rememberDraggableState { delta ->
+                                                        if (maxIndex == 0 || fastScrollTrackHeightPx == 0) return@rememberDraggableState
+                                                        val available =
+                                                            (fastScrollTrackHeightPx - fastScrollThumbHeightPx)
+                                                                .coerceAtLeast(0)
+                                                        val nextOffset = (thumbOffsetPx + delta)
+                                                            .coerceIn(0f, available.toFloat())
+                                                        fastScrollOffsetPx = nextOffset
+                                                        val fraction = if (available == 0) 0f else nextOffset / available
+                                                        val targetIndex = (fraction * maxIndex).roundToInt()
+                                                        fastScrollTargetIndex = targetIndex
+                                                        scope.launch {
+                                                            listState.scrollToItem(targetIndex)
+                                                        }
+                                                    },
+                                                    onDragStopped = {
+                                                        fastScrollTargetIndex?.let { targetIndex ->
+                                                            scope.launch {
+                                                                listState.animateScrollToItem(targetIndex)
+                                                            }
+                                                        }
+                                                        fastScrollOffsetPx = null
+                                                        fastScrollTargetIndex = null
+                                                    }
+                                                )
+                                        )
                                     }
                                 }
                             }
@@ -429,9 +498,9 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                         if (currentStep < 2) {
                             currentStep++
                         } else {
-             ShizukuManager.requestPermissionAndBind()
-             onComplete()
-                       }
+                            ShizukuManager.requestPermissionAndBind()
+                            onComplete()
+                        }
                     },
                     enabled = if (currentStep == 1) hasConfirmedWarning else true
                 ) {
@@ -740,20 +809,19 @@ fun AppListItem(
             ) {
                 IconButton(
                     onClick = {
-        onToggle(appData.packageName, appData.isDisabled)
-    },
-    modifier = Modifier.size(36.dp)
-) {
-    Icon(
-        if (appData.isDisabled) Icons.Default.CheckCircle else Icons.Default.Block,
-        contentDescription = if (appData.isDisabled) "Enable" else "Disable",
-        modifier = Modifier.size(18.dp),
-        tint = if (appData.isDisabled)
-            MaterialTheme.colorScheme.primary
-        else
-            MaterialTheme.colorScheme.error
-    )
-}
+                        onToggle(appData.packageName, appData.isDisabled)
+                    },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        if (appData.isDisabled) Icons.Default.CheckCircle else Icons.Default.Block,
+                        contentDescription = if (appData.isDisabled) "Enable" else "Disable",
+                        modifier = Modifier.size(18.dp),
+                        tint = if (appData.isDisabled)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.error
+                    )
                 }
                 IconButton(
                     onClick = { onUninstall(appData.packageName) },
@@ -777,6 +845,8 @@ fun AppListItem(
             thickness = 0.5.dp
         )
     }
+}
+
 private suspend fun loadAllAppDataWithIcons(
     pm: PackageManager
 ): List<AppData> = withContext(Dispatchers.Default) {
