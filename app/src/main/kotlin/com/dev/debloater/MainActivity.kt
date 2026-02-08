@@ -95,6 +95,7 @@ data class AppData(
     val packageName: String,
     val appName: String,
     val isSystem: Boolean,
+    val isInstalled: Boolean,
     var isDisabled: Boolean,
     val icon: ImageBitmap? = null
 )
@@ -242,7 +243,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                                     if (isDisabled) "enable" to pkg
                                                     else "disable" to pkg
                                             },
-                                            onUninstall = { confirmAction = "uninstall" to it }
+                                            onUninstall = { confirmAction = "uninstall" to it },
+                                            onRestore = { confirmAction = "restore" to it }
                                         )
                                     }
                                 }
@@ -263,6 +265,9 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                 },
                                 onUninstall = {
                                     confirmAction = "uninstall" to app.packageName
+                                    },
+                                onRestore = {
+                                    confirmAction = "restore" to app.packageName
                                 }
                             )
                         } ?: Box(Modifier.fillMaxSize())
@@ -282,6 +287,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                             when (action) {
                                 "disable" -> "Confirm disable"
                                 "enable" -> "Confirm enable"
+                                "restore" -> "Confirm restore"
                                 else -> "Confirm uninstall"
                             }
                         )
@@ -291,7 +297,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                             when (action) {
                                 "disable" -> "Disable $pkg ? You can enable it later."
                                 "enable" -> "Enable $pkg ?"
-                                else -> "Uninstall $pkg ? This cannot be undone."
+                                "restore" -> "Restore $pkg for this user?"
+                                else -> "Uninstall $pkg ? You can restore it later."
                             }
                         )
                     },
@@ -322,9 +329,20 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
 
                                         "uninstall" -> {
                                             ShizukuManager.uninstall(pkg)
-                                            allAppData = allAppData.filter {
-                                                it.packageName != pkg
+                                            allAppData = allAppData.map {
+                                                if (it.packageName == pkg) {
+                                                    it.copy(isInstalled = false, isDisabled = false)
+                                                } else {
+                                                    it
+                                                }
                                             }
+                                            selectedApp = allAppData.find { it.packageName == pkg }
+                                        }
+
+                                        "restore" -> {
+                                            ShizukuManager.restore(pkg)
+                                            allAppData = loadAllAppDataWithIcons(pm)
+                                            selectedApp = allAppData.find { it.packageName == pkg }
                                         }
                                     }
                                 }
@@ -335,6 +353,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                 when (action) {
                                     "disable" -> "Disable"
                                     "enable" -> "Enable"
+                                    "restore" -> "Restore"
                                     else -> "Uninstall"
                                 }
                             )
@@ -603,7 +622,8 @@ fun AppListItem(
     appData: AppData,
     onClick: () -> Unit,
     onToggle: (String, Boolean) -> Unit,
-    onUninstall: (String) -> Unit
+    onUninstall: (String) -> Unit,
+    onRestore: (String) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -673,6 +693,22 @@ fun AppListItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f, fill = false)
                     )
+                    if (!appData.isInstalled) {
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.wrapContentWidth()
+                        )
+                        Text(
+                            text = "Uninstalled",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip,
+                            modifier = Modifier.wrapContentWidth()
+                        )
+                    }
                     if (appData.isSystem) {
                         Text(
                             text = "•",
@@ -696,33 +732,46 @@ fun AppListItem(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.wrapContentWidth()
             ) {
-                IconButton(
-                    onClick = {
-        onToggle(appData.packageName, appData.isDisabled)
-    },
-    modifier = Modifier.size(36.dp)
-) {
-    Icon(
-        if (appData.isDisabled) Icons.Default.CheckCircle else Icons.Default.Block,
-        contentDescription = if (appData.isDisabled) "Enable" else "Disable",
-        modifier = Modifier.size(18.dp),
-        tint = if (appData.isDisabled)
-            MaterialTheme.colorScheme.primary
-        else
-            MaterialTheme.colorScheme.error
-    )
-}
-                }
-                IconButton(
-                    onClick = { onUninstall(appData.packageName) },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Uninstall",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
+                if (appData.isInstalled) {
+                    IconButton(
+                        onClick = {
+                            onToggle(appData.packageName, appData.isDisabled)
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            if (appData.isDisabled) Icons.Default.CheckCircle else Icons.Default.Block,
+                            contentDescription = if (appData.isDisabled) "Enable" else "Disable",
+                            modifier = Modifier.size(18.dp),
+                            tint = if (appData.isDisabled)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.error
+                        )
+                    }
+                    IconButton(
+                        onClick = { onUninstall(appData.packageName) },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Uninstall",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                } else {
+                    IconButton(
+                        onClick = { onRestore(appData.packageName) },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Restore,
+                            contentDescription = "Restore",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -740,10 +789,11 @@ private suspend fun loadAllAppDataWithIcons(
 ): List<AppData> = withContext(Dispatchers.Default) {
 
     try {
-        pm.getInstalledPackages(PackageManager.MATCH_ALL)
+        pm.getInstalledPackages(PackageManager.MATCH_ALL or PackageManager.MATCH_UNINSTALLED_PACKAGES)
             .asSequence()
             .mapNotNull { pkg ->
                 val app = pkg.applicationInfo ?: return@mapNotNull null
+                val isInstalled = app.flags and ApplicationInfo.FLAG_INSTALLED != 0
 
                 val icon = try {
                     app.loadIcon(pm).toBitmap().asImageBitmap()
@@ -760,6 +810,7 @@ private suspend fun loadAllAppDataWithIcons(
                         app.flags and ApplicationInfo.FLAG_SYSTEM != 0 ||
                         app.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
                     isDisabled = !app.enabled,
+                    isInstalled = isInstalled,
                     icon = icon
                 )
             }
