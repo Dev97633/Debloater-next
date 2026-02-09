@@ -2,18 +2,27 @@
 
 package com.dev.debloater
 
-import android.content.Context
-import android.content.pm.PackageManager
-import androidx.core.graphics.drawable.toBitmap
 import android.os.Build
 import android.os.Bundle
+import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideIntoContainer
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutOfContainer
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -22,7 +31,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -41,14 +49,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.core.graphics.drawable.toBitmap
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import android.content.pm.ApplicationInfo
+
 
 private const val PREFS_NAME = "DebloaterPrefs"
 private const val KEY_FIRST_LAUNCH = "first_launch"
@@ -96,7 +102,7 @@ data class AppData(
     val appName: String,
     val isSystem: Boolean,
     val isInstalled: Boolean,
-    var isDisabled: Boolean,
+    val isDisabled: Boolean,
     val icon: ImageBitmap? = null
 )
 
@@ -128,6 +134,14 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val appListState = rememberLazyListState()
     val suggestionListState = rememberLazyListState()
     val smoothFlingBehavior = ScrollableDefaults.flingBehavior()
+
+    fun updateAppData(packageName: String, transform: (AppData) -> AppData) {
+        val updatedList = allAppData.map { appData ->
+            if (appData.packageName == packageName) transform(appData) else appData
+        }
+        allAppData = updatedList
+        selectedApp = updatedList.find { it.packageName == packageName }
+    }
 
     // Handle system back button
     val backCallback = remember {
@@ -357,34 +371,17 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                     when (action) {
                                         "disable" -> {
                                             ShizukuManager.disable(pkg)
-                                            allAppData = allAppData.map {
-                                                if (it.packageName == pkg)
-                                                    it.copy(isDisabled = true)
-                                                else it
-                                            }
-                                            selectedApp = allAppData.find { it.packageName == pkg }
+                                            updateAppData(pkg) { it.copy(isDisabled = true) }
                                         }
 
                                         "enable" -> {
                                             ShizukuManager.enable(pkg)
-                                            allAppData = allAppData.map {
-                                                if (it.packageName == pkg)
-                                                    it.copy(isDisabled = false)
-                                                else it
-                                            }
-                                            selectedApp = allAppData.find { it.packageName == pkg }
+                                            updateAppData(pkg) { it.copy(isDisabled = false) }
                                         }
 
                                         "uninstall" -> {
                                             ShizukuManager.uninstall(pkg)
-                                            allAppData = allAppData.map {
-                                                if (it.packageName == pkg) {
-                                                    it.copy(isInstalled = false, isDisabled = false)
-                                                } else {
-                                                    it
-                                                }
-                                            }
-                                            selectedApp = allAppData.find { it.packageName == pkg }
+                                            updateAppData(pkg) { it.copy(isInstalled = false, isDisabled = false) }
                                         }
 
                                         "restore" -> {
@@ -449,8 +446,9 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                         if (currentStep < 2) {
                             currentStep++
                         } else {
-             ShizukuManager.requestPermissionAndBind()
-             onComplete()
+                            ShizukuManager.requestPermissionAndBind()
+                            onComplete()
+                        }
                        }
                     },
                     enabled = if (currentStep == 1) hasConfirmedWarning else true
@@ -869,7 +867,7 @@ private suspend fun loadAllAppDataWithIcons(
                     icon = icon
                 )
             }
-            .sortedBy { it.appName.lowercase() }
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.appName })
             .toList()
 
     } catch (e: Exception) {
