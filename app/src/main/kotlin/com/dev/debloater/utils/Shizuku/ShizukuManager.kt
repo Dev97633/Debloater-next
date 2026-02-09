@@ -30,7 +30,8 @@ object ShizukuManager {
 
     private fun showMessage(msg: String, duration: SnackbarDuration = SnackbarDuration.Short) {
         scope.launch {
-            snackbarHostState?.showSnackbar(msg, duration = duration) ?: Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            snackbarHostState?.showSnackbar(msg, duration = duration)
+                ?: Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -124,64 +125,36 @@ object ShizukuManager {
         }
     }
 
-    fun uninstall(packageName: String) {
-        if (!isBound || debloaterService == null) {
+    private inline fun runServiceAction(
+        action: String,
+        packageName: String,
+        crossinline block: (IDebloaterService) -> Unit
+    ) {
+        val service = debloaterService
+        if (!isBound || service == null) {
             showMessage("Shizuku not connected - retrying...")
             attemptBind()
             return
         }
 
         try {
-            debloaterService?.uninstall(packageName)
-            showMessage("Uninstall command sent: $packageName")
+            block(service)
+            showMessage("$action command sent: $packageName")
         } catch (e: Exception) {
-            showMessage("Uninstall failed: ${e.message}", SnackbarDuration.Long)
+            showMessage("$action failed: ${e.message}", SnackbarDuration.Long)
         }
     }
-    
+     fun uninstall(packageName: String) {
+        runServiceAction("Uninstall", packageName) { it.uninstall(packageName) }
+    }
     fun restore(packageName: String) {
-        if (!isBound || debloaterService == null) {
-            showMessage("Shizuku not connected - retrying...")
-            attemptBind()
-            return
-        }
-
-        try {
-            debloaterService?.restore(packageName)
-            showMessage("Restore command sent: $packageName")
-        } catch (e: Exception) {
-            showMessage("Restore failed: ${e.message}", SnackbarDuration.Long)
-        }
+        runServiceAction("Restore", packageName) { it.restore(packageName) }
     }
-
-    fun disable(packageName: String) {
-        if (!isBound || debloaterService == null) {
-            showMessage("Shizuku not connected - retrying...")
-            attemptBind()
-            return
-        }
-
-        try {
-            debloaterService?.disable(packageName)
-            showMessage("Disable command sent: $packageName")
-        } catch (e: Exception) {
-            showMessage("Disable failed: ${e.message}", SnackbarDuration.Long)
-        }
+        fun disable(packageName: String) {
+        runServiceAction("Disable", packageName) { it.disable(packageName) }
     }
-
         fun enable(packageName: String) {
-        if (!isBound || debloaterService == null) {
-            showMessage("Shizuku not connected - retrying...")
-            attemptBind()
-            return
-        }
-
-        try {
-            debloaterService?.enable(packageName)
-            showMessage("Enable command sent: $packageName")
-        } catch (e: Exception) {
-            showMessage("Enable failed: ${e.message}", SnackbarDuration.Long)
-        }
+        runServiceAction("Enable", packageName) { it.enable(packageName) }
     }
 
 }
