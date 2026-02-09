@@ -100,6 +100,12 @@ data class AppData(
     val icon: ImageBitmap? = null
 )
 
+data class ConfirmAction(
+    val action: String,
+    val packageName: String,
+    val appName: String
+)
+
 @Composable
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
@@ -118,7 +124,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
-    var confirmAction by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var confirmAction by remember { mutableStateOf<ConfirmAction?>(null) }
     val appListState = rememberLazyListState()
     val suggestionListState = rememberLazyListState()
     val smoothFlingBehavior = ScrollableDefaults.flingBehavior()
@@ -238,13 +244,36 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                                 selectedApp = appData
                                                 currentScreen = "details"
                                             },
-                                            onToggle = { pkg, isDisabled ->
+                                            onToggle = { appData, isDisabled ->
                                                 confirmAction =
-                                                    if (isDisabled) "enable" to pkg
-                                                    else "disable" to pkg
+                                                    if (isDisabled) {
+                                                        ConfirmAction(
+                                                            action = "enable",
+                                                            packageName = appData.packageName,
+                                                            appName = appData.appName
+                                                        )
+                                                    } else {
+                                                        ConfirmAction(
+                                                            action = "disable",
+                                                            packageName = appData.packageName,
+                                                            appName = appData.appName
+                                                        )
+                                                    }
                                             },
-                                            onUninstall = { confirmAction = "uninstall" to it },
-                                            onRestore = { confirmAction = "restore" to it }
+                                            onUninstall = { appDataToRemove ->
+                                                confirmAction = ConfirmAction(
+                                                    action = "uninstall",
+                                                    packageName = appDataToRemove.packageName,
+                                                    appName = appDataToRemove.appName
+                                                )
+                                            },
+                                            onRestore = { appDataToRestore ->
+                                                confirmAction = ConfirmAction(
+                                                    action = "restore",
+                                                    packageName = appDataToRestore.packageName,
+                                                    appName = appDataToRestore.appName
+                                                )
+                                            }
                                         )
                                     }
                                 }
@@ -260,14 +289,33 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                 },
                                 onDisable = {
                                     confirmAction =
-                                        if (app.isDisabled) "enable" to app.packageName
-                                        else "disable" to app.packageName
+                                        if (app.isDisabled) {
+                                            ConfirmAction(
+                                                action = "enable",
+                                                packageName = app.packageName,
+                                                appName = app.appName
+                                            )
+                                        } else {
+                                            ConfirmAction(
+                                                action = "disable",
+                                                packageName = app.packageName,
+                                                appName = app.appName
+                                            )
+                                        }
                                 },
                                 onUninstall = {
-                                    confirmAction = "uninstall" to app.packageName
+                                    confirmAction = ConfirmAction(
+                                        action = "uninstall",
+                                        packageName = app.packageName,
+                                        appName = app.appName
+                                    )
                                     },
                                 onRestore = {
-                                    confirmAction = "restore" to app.packageName
+                                    confirmAction = ConfirmAction(
+                                        action = "restore",
+                                        packageName = app.packageName,
+                                        appName = app.appName
+                                    )
                                 }
                             )
                         } ?: Box(Modifier.fillMaxSize())
@@ -279,7 +327,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 }
             }
 
-            confirmAction?.let { (action, pkg) ->
+            confirmAction?.let { (action, pkg, appName) ->
                 AlertDialog(
                     onDismissRequest = { confirmAction = null },
                     title = {
@@ -295,10 +343,10 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     text = {
                         Text(
                             when (action) {
-                                "disable" -> "Disable $pkg ? You can enable it later."
-                                "enable" -> "Enable $pkg ?"
-                                "restore" -> "Restore $pkg for this user?"
-                                else -> "Uninstall $pkg ? You can restore it later."
+                                "disable" -> "Disable $appName ($pkg) ? You can enable it later."
+                                "enable" -> "Enable $appName ($pkg) ?"
+                                "restore" -> "Restore $appName ($pkg) for this user?"
+                                else -> "Uninstall $appName ($pkg) ? You can restore it later."
                             }
                         )
                     },
@@ -621,9 +669,9 @@ fun DebloaterTopBar(
 fun AppListItem(
     appData: AppData,
     onClick: () -> Unit,
-    onToggle: (String, Boolean) -> Unit,
-    onUninstall: (String) -> Unit,
-    onRestore: (String) -> Unit
+    onToggle: (AppData, Boolean) -> Unit,
+    onUninstall: (AppData) -> Unit,
+    onRestore: (AppData) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -735,7 +783,7 @@ fun AppListItem(
                 if (appData.isInstalled) {
                     IconButton(
                         onClick = {
-                            onToggle(appData.packageName, appData.isDisabled)
+                            onToggle(appData, appData.isDisabled)
                         },
                         modifier = Modifier.size(36.dp)
                     ) {
@@ -750,7 +798,7 @@ fun AppListItem(
                         )
                     }
                     IconButton(
-                        onClick = { onUninstall(appData.packageName) },
+                        onClick = { onUninstall(appData) },
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
@@ -762,7 +810,7 @@ fun AppListItem(
                     }
                 } else {
                     IconButton(
-                        onClick = { onRestore(appData.packageName) },
+                        onClick = { onRestore(appData) },
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
