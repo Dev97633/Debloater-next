@@ -1,16 +1,9 @@
 package com.dev.debloater
 
 import android.os.Process
-import com.dev.debloater.IDebloaterService
 import java.io.DataOutputStream
 
 class DebloaterService : IDebloaterService.Stub() {
-
-    // Only a single no-arg constructor is allowed for AIDL Stub in Kotlin
-    // Shizuku will instantiate it directly
-    init {
-        // Optional: any initialization here
-    }
 
     override fun uninstall(packageName: String) {
         executeShellCommand("pm uninstall --user 0 $packageName")
@@ -25,7 +18,7 @@ class DebloaterService : IDebloaterService.Stub() {
     }
 
     override fun enable(packageName: String) {
-    Runtime.getRuntime().exec(arrayOf("pm", "enable", packageName))
+    executeShellCommand("pm enable $packageName")
     }
 
     private fun executeShellCommand(command: String) {
