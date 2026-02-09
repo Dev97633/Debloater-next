@@ -11,13 +11,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideIntoContainer
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutOfContainer
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -223,8 +220,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                 AnimatedContent(
                     targetState = currentScreen,
                     transitionSpec = {
-                        (fadeIn(tween(300)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left))
-                            .togetherWith(fadeOut(tween(300)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right))
+                        (fadeIn(tween(300)) + slideInHorizontally { it })
+                            .togetherWith(fadeOut(tween(300)) + slideOutHorizontally { -it })
                     },
                     label = "screen_transition"
                 ) { screen ->
@@ -449,7 +446,6 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                             ShizukuManager.requestPermissionAndBind()
                             onComplete()
                         }
-                       }
                     },
                     enabled = if (currentStep == 1) hasConfirmedWarning else true
                 ) {
