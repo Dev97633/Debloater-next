@@ -323,7 +323,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                     currentScreen = "apps"
                                     selectedApp = null
                                 },
-                                if (!app.isDisabled && app.safetyLevel == SafetyLevel.RISKY) {
+                                onDisable = {
+                                    if (!app.isDisabled && app.safetyLevel == SafetyLevel.RISKY) {
                                         riskyOverrideAction = ConfirmAction(
                                             action = "disable",
                                             packageName = app.packageName,
