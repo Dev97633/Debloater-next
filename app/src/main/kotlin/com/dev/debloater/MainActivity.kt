@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -100,6 +101,7 @@ data class AppData(
     val isSystem: Boolean,
     val isInstalled: Boolean,
     val isDisabled: Boolean,
+    val safetyLevel: SafetyLevel,
     val icon: ImageBitmap? = null
 )
 
@@ -108,6 +110,20 @@ data class ConfirmAction(
     val packageName: String,
     val appName: String
 )
+
+private fun SafetyLevel.badgeColorScheme(): Pair<Color, Color> =
+    when (this) {
+        SafetyLevel.SAFE -> Color(0xFF1B5E20) to Color(0xFFE8F5E9)
+        SafetyLevel.CAUTION -> Color(0xFFF57F17) to Color(0xFFFFF8E1)
+        SafetyLevel.RISKY -> Color(0xFFB71C1C) to Color(0xFFFFEBEE)
+    }
+
+private fun safetyLabel(level: SafetyLevel): String =
+    when (level) {
+        SafetyLevel.SAFE -> "Safe"
+        SafetyLevel.CAUTION -> "Caution"
+        SafetyLevel.RISKY -> "Risky"
+    }
 
 @Composable
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
@@ -128,6 +144,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var active by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmAction by remember { mutableStateOf<ConfirmAction?>(null) }
+    var riskyOverrideAction by remember { mutableStateOf<ConfirmAction?>(null) }
     val appListState = rememberLazyListState()
     val suggestionListState = rememberLazyListState()
     val smoothFlingBehavior = ScrollableDefaults.flingBehavior()
@@ -256,20 +273,28 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                                 currentScreen = "details"
                                             },
                                             onToggle = { appData, isDisabled ->
-                                                confirmAction =
-                                                    if (isDisabled) {
-                                                        ConfirmAction(
-                                                            action = "enable",
-                                                            packageName = appData.packageName,
-                                                            appName = appData.appName
-                                                        )
-                                                    } else {
-                                                        ConfirmAction(
-                                                            action = "disable",
-                                                            packageName = appData.packageName,
-                                                            appName = appData.appName
-                                                        )
-                                                    }
+                                                if (!isDisabled && appData.safetyLevel == SafetyLevel.RISKY) {
+                                                    riskyOverrideAction = ConfirmAction(
+                                                        action = "disable",
+                                                        packageName = appData.packageName,
+                                                        appName = appData.appName
+                                                    )
+                                                } else {
+                                                    confirmAction =
+                                                        if (isDisabled) {
+                                                            ConfirmAction(
+                                                                action = "enable",
+                                                                packageName = appData.packageName,
+                                                                appName = appData.appName
+                                                            )
+                                                        } else {
+                                                            ConfirmAction(
+                                                                action = "disable",
+                                                                packageName = appData.packageName,
+                                                                appName = appData.appName
+                                                            )
+                                                        }
+                                                }
                                             },
                                             onUninstall = { appDataToRemove ->
                                                 confirmAction = ConfirmAction(
@@ -298,21 +323,28 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                     currentScreen = "apps"
                                     selectedApp = null
                                 },
-                                onDisable = {
-                                    confirmAction =
-                                        if (app.isDisabled) {
-                                            ConfirmAction(
-                                                action = "enable",
-                                                packageName = app.packageName,
-                                                appName = app.appName
-                                            )
-                                        } else {
-                                            ConfirmAction(
-                                                action = "disable",
-                                                packageName = app.packageName,
-                                                appName = app.appName
-                                            )
-                                        }
+                                if (!app.isDisabled && app.safetyLevel == SafetyLevel.RISKY) {
+                                        riskyOverrideAction = ConfirmAction(
+                                            action = "disable",
+                                            packageName = app.packageName,
+                                            appName = app.appName
+                                        )
+                                    } else {
+                                        confirmAction =
+                                            if (app.isDisabled) {
+                                                ConfirmAction(
+                                                    action = "enable",
+                                                    packageName = app.packageName,
+                                                    appName = app.appName
+                                                )
+                                            } else {
+                                                ConfirmAction(
+                                                    action = "disable",
+                                                    packageName = app.packageName,
+                                                    appName = app.appName
+                                                )
+                                            }
+                                    }
                                 },
                                 onUninstall = {
                                     confirmAction = ConfirmAction(
@@ -337,6 +369,32 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     }
                 }
             }
+
+            riskyOverrideAction?.let { (action, pkg, appName) ->
+                AlertDialog(
+                    onDismissRequest = { riskyOverrideAction = null },
+                    title = { Text("Critical app warning") },
+                    text = {
+                        Text(
+                            "$appName ($pkg) is classified as risky and may break core system functionality if disabled. Continue anyway?"
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            confirmAction = ConfirmAction(action = action, packageName = pkg, appName = appName)
+                            riskyOverrideAction = null
+                        }) {
+                            Text("I understand, continue")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { riskyOverrideAction = null }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+
 
             confirmAction?.let { (action, pkg, appName) ->
                 AlertDialog(
@@ -735,6 +793,36 @@ fun AppListItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f, fill = false)
                     )
+                    val (labelColor, bgColor) = appData.safetyLevel.badgeColorScheme()
+                    AssistChip(
+                        onClick = {},
+                        enabled = false,
+                        label = {
+                            Text(
+                                text = safetyLabel(appData.safetyLevel),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = when (appData.safetyLevel) {
+                                    SafetyLevel.SAFE -> Icons.Default.Verified
+                                    SafetyLevel.CAUTION -> Icons.Default.WarningAmber
+                                    SafetyLevel.RISKY -> Icons.Default.Dangerous
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = bgColor,
+                            labelColor = labelColor,
+                            leadingIconContentColor = labelColor,
+                            disabledContainerColor = bgColor,
+                            disabledLabelColor = labelColor,
+                            disabledLeadingIconContentColor = labelColor
+                        )
+                    )
                     if (!appData.isInstalled) {
                         Text(
                             text = "•",
@@ -860,6 +948,7 @@ private suspend fun loadAllAppDataWithIcons(
                     } ?: false,
                     isDisabled = appInfo?.enabled == false,
                     isInstalled = isInstalled,
+                    safetyLevel = SafetyClassifier.classify(pkg.packageName),
                     icon = icon
                 )
             }
