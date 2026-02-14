@@ -49,7 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.core.graphics.drawable.toBitmap
+
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1002,10 +1002,6 @@ private suspend fun loadAllAppDataWithIcons(
                     ?.and(ApplicationInfo.FLAG_INSTALLED)
                     ?.let { it != 0 }
                     ?: false
-                val icon = appInfo?.let {
-                    runCatching { it.loadIcon(pm).toBitmap().asImageBitmap() }.getOrNull()
-                }
-
                 AppData(
                     packageName = pkg.packageName,
                     appName = appInfo?.let {
@@ -1018,7 +1014,8 @@ private suspend fun loadAllAppDataWithIcons(
                     isDisabled = appInfo?.enabled == false,
                     isInstalled = isInstalled,
                     safetyLevel = SafetyClassifier.classify(pkg.packageName),
-                    icon = icon
+                    // Avoid eagerly decoding every app icon into memory to prevent startup OOM crashes.
+                    icon = null
                 )
             }
             .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.appName })
