@@ -20,6 +20,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -111,6 +113,13 @@ data class ConfirmAction(
     val appName: String
 )
 
+data class AppFilters(
+    val systemOnly: Boolean = false,
+    val userOnly: Boolean = false,
+    val disabledOnly: Boolean = false,
+    val uninstalledOnly: Boolean = false,
+)
+
 private fun SafetyLevel.badgeColorScheme(): Pair<Color, Color> =
     when (this) {
         SafetyLevel.SAFE -> Color(0xFF1B5E20) to Color(0xFFE8F5E9)
@@ -142,6 +151,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var allAppData by remember { mutableStateOf<List<AppData>>(emptyList()) }
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
+    var filters by rememberSaveable { mutableStateOf(AppFilters()) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmAction by remember { mutableStateOf<ConfirmAction?>(null) }
     var riskyOverrideAction by remember { mutableStateOf<ConfirmAction?>(null) }
@@ -189,10 +199,23 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
 
     val filteredAppData by remember {
         derivedStateOf {
-            if (query.isBlank()) allAppData
-            else allAppData.filter {
-                it.appName.contains(query, ignoreCase = true) ||
-                it.packageName.contains(query, ignoreCase = true)
+            val trimmedQuery = query.trim()
+
+            allAppData.filter { appData ->
+                val matchesQuery = trimmedQuery.isBlank() ||
+                    appData.appName.contains(trimmedQuery, ignoreCase = true) ||
+                    appData.packageName.contains(trimmedQuery, ignoreCase = true)
+
+                val matchesSystemUser = when {
+                    filters.systemOnly -> appData.isSystem
+                    filters.userOnly -> !appData.isSystem
+                    else -> true
+                }
+
+                val matchesDisabled = !filters.disabledOnly || appData.isDisabled
+                val matchesUninstalled = !filters.uninstalledOnly || !appData.isInstalled
+
+                matchesQuery && matchesSystemUser && matchesDisabled && matchesUninstalled
             }
         }
     }
@@ -212,6 +235,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                     onActiveChange = { active = it },
                     suggestions = filteredAppData.take(10),
                     onSuggestionClick = { query = it; active = false },
+                    filters = filters,
+                    onFiltersChange = { filters = it },
                     suggestionListState = suggestionListState,
                     smoothFlingBehavior = smoothFlingBehavior,
                     currentScreen = currentScreen,
@@ -633,6 +658,8 @@ fun DebloaterTopBar(
     onActiveChange: (Boolean) -> Unit,
     suggestions: List<AppData>,
     onSuggestionClick: (String) -> Unit,
+    filters: AppFilters,
+    onFiltersChange: (AppFilters) -> Unit,
     suggestionListState: LazyListState,
     smoothFlingBehavior: FlingBehavior,
     currentScreen: String,
@@ -669,49 +696,90 @@ fun DebloaterTopBar(
         )
 
         if (currentScreen == "apps") {
-            SearchBar(
-                query = query,
-                onQueryChange = onQueryChange,
-                onSearch = { onActiveChange(false) },
-                active = active,
-                onActiveChange = onActiveChange,
-                placeholder = { Text("Search apps") },
-                leadingIcon = {
-                    if (active) {
-                        IconButton(onClick = {
-                            onQueryChange("")
-                            onActiveChange(false)
-                        }) {
-                            Icon(Icons.Default.ArrowBack, null)
-                        }
-                    } else {
-                        Icon(Icons.Default.Search, null)
-                    }
-                },
-                trailingIcon = {
-                    if (query.isNotBlank()) {
-                        IconButton(onClick = { onQueryChange("") }) {
-                            Icon(Icons.Default.Close, null)
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                LazyColumn(
-                    state = suggestionListState,
-                    flingBehavior = smoothFlingBehavior
-                ) {
-                    items(suggestions, key = { it.packageName }) { appData ->
-                        ListItem(
-                            headlineContent = { Text(appData.appName) },
-                            supportingContent = { Text(appData.packageName) },
-                            modifier = Modifier.clickable {
-                                onSuggestionClick(appData.appName)
+            Column {
+                SearchBar(
+                    query = query,
+                    onQueryChange = onQueryChange,
+                    onSearch = { onActiveChange(false) },
+                    active = active,
+                    onActiveChange = onActiveChange,
+                    placeholder = { Text("Search apps") },
+                    leadingIcon = {
+                        if (active) {
+                            IconButton(onClick = {
+                                onQueryChange("")
+                                onActiveChange(false)
+                            }) {
+                                Icon(Icons.Default.ArrowBack, null)
                             }
-                        )
+                        } else {
+                            Icon(Icons.Default.Search, null)
+                        }
+                    },
+                    trailingIcon = {
+                        if (query.isNotBlank()) {
+                            IconButton(onClick = { onQueryChange("") }) {
+                                Icon(Icons.Default.Close, null)
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    LazyColumn(
+                        state = suggestionListState,
+                        flingBehavior = smoothFlingBehavior
+                    ) {
+                        items(suggestions, key = { it.packageName }) { appData ->
+                            ListItem(
+                                headlineContent = { Text(appData.appName) },
+                                supportingContent = { Text(appData.packageName) },
+                                modifier = Modifier.clickable {
+                                    onSuggestionClick(appData.appName)
+                                }
+                            )
+                        }
                     }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = filters.systemOnly,
+                        onClick = {
+                            val enabled = !filters.systemOnly
+                            onFiltersChange(filters.copy(systemOnly = enabled, userOnly = if (enabled) false else filters.userOnly))
+                        },
+                        label = { Text("System") }
+                    )
+                    FilterChip(
+                        selected = filters.userOnly,
+                        onClick = {
+                            val enabled = !filters.userOnly
+                            onFiltersChange(filters.copy(userOnly = enabled, systemOnly = if (enabled) false else filters.systemOnly))
+                        },
+                        label = { Text("User") }
+                    )
+                    FilterChip(
+                        selected = filters.disabledOnly,
+                        onClick = {
+                            onFiltersChange(filters.copy(disabledOnly = !filters.disabledOnly))
+                        },
+                        label = { Text("Disabled") }
+                    )
+                    FilterChip(
+                        selected = filters.uninstalledOnly,
+                        onClick = {
+                            onFiltersChange(filters.copy(uninstalledOnly = !filters.uninstalledOnly))
+                        },
+                        label = { Text("Uninstalled") }
+                    )
                 }
             }
         }
