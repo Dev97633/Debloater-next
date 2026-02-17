@@ -4,6 +4,7 @@ package com.dev.debloater
 
 import android.os.Build
 import android.os.Bundle
+import android.app.Activity
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -134,7 +135,7 @@ private fun safetyLabel(level: SafetyLevel): String =
 @Composable
 fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val context = LocalContext.current
-    val activity = (LocalContext.current as ComponentActivity)
+    val activity = context as? Activity
     val pm = context.packageManager
     val scope = rememberCoroutineScope()
 
@@ -164,27 +165,14 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         selectedApp = updatedList.find { it.packageName == packageName }
     }
 
-    // Handle system back button
-    val backCallback = remember {
-        object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (currentScreen == "onboarding") {
-                    isEnabled = false
-                    activity.onBackPressed()
-                } else if (currentScreen != "apps") {
-                    currentScreen = "apps"
-                    selectedApp = null
-                } else {
-                    isEnabled = false
-                    activity.onBackPressed()
-                }
-            }
+    BackHandler {
+        if (currentScreen != "apps") {
+            currentScreen = "apps"
+            selectedApp = null
+        } else {
+            activity?.finish()
+    
         }
-    }
-
-    DisposableEffect(Unit) {
-        activity.onBackPressedDispatcher.addCallback(backCallback)
-        onDispose { backCallback.remove() }
     }
 
     // Load apps only after onboarding
