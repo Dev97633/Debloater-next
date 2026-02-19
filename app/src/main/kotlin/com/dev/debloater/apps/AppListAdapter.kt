@@ -3,6 +3,7 @@ package com.dev.debloater.apps
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -35,20 +36,17 @@ class AppListAdapter : ListAdapter<AppItem, AppListAdapter.AppViewHolder>(DiffCa
     }
 
     class AppViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val appIcon: ImageView = itemView.findViewById(R.id.imageAppIcon)
         private val appLabelText: TextView = itemView.findViewById(R.id.textAppLabel)
         private val packageNameText: TextView = itemView.findViewById(R.id.textPackageName)
         private val stateText: TextView = itemView.findViewById(R.id.textState)
 
         fun bind(item: AppItem) {
+            appIcon.setImageDrawable(item.icon)
             appLabelText.text = item.appLabel
             packageNameText.text = item.packageName
 
-            val stateParts = buildList {
-                add(if (item.isSystemApp) "System" else "User")
-                if (item.isDisabled) add("Disabled")
-                if (!item.isInstalled) add("Uninstalled")
-            }
-            stateText.text = stateParts.joinToString(separator = " • ")
+            stateText.text = item.stateText
         }
     }
 }
