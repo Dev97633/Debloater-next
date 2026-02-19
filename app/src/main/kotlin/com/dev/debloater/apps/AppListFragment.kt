@@ -39,6 +39,8 @@ class AppListFragment : Fragment(R.layout.fragment_app_list) {
             adapter = appAdapter
             layoutManager = LinearLayoutManager(requireContext())
             setHasFixedSize(true)
+            setItemViewCacheSize(24)
+            itemAnimator = null
         }
 
         // Load source apps once; ViewModel will handle all filtering combinations.
@@ -100,13 +102,25 @@ class AppListFragment : Fragment(R.layout.fragment_app_list) {
                 val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                 val isInstalled = (appInfo.flags and ApplicationInfo.FLAG_INSTALLED) != 0
                 val isDisabled = !appInfo.enabled
+                val stateText = buildString {
+                    append(if (isSystem) "System" else "User")
+                    if (isDisabled) append(" • Disabled")
+                    if (!isInstalled) append(" • Uninstalled")
+                }
+
+                val appLabel = pm.getApplicationLabel(appInfo).toString()
+                val packageName = appInfo.packageName
 
                 AppItem(
-                    appLabel = pm.getApplicationLabel(appInfo).toString(),
-                    packageName = appInfo.packageName,
+                    appLabel = appLabel,
+                    packageName = packageName,
+                    appLabelKey = appLabel.lowercase(),
+                    packageNameKey = packageName.lowercase(),
                     isSystemApp = isSystem,
                     isDisabled = isDisabled,
                     isInstalled = isInstalled,
+                    stateText = stateText,
+                    icon = pm.getApplicationIcon(appInfo),
                 )
             }
             .sortedBy { it.appLabel.lowercase() }
