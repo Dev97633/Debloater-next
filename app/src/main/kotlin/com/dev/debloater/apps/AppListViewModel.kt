@@ -86,13 +86,12 @@ class AppListViewModel : ViewModel() {
         query: String,
         filters: FilterState,
     ): List<AppItem> {
-        val trimmedQuery = query.trim()
-
+        val normalizedQuery = query.trim().lowercase()
         return apps.filter { app ->
-            val matchesQuery = trimmedQuery.isBlank() ||
-                app.appLabel.contains(trimmedQuery, ignoreCase = true) ||
-                app.packageName.contains(trimmedQuery, ignoreCase = true)
-
+            val matchesQuery = normalizedQuery.isBlank() ||
+                app.appLabelKey.contains(normalizedQuery) ||
+                app.packageNameKey.contains(normalizedQuery)
+                
             val matchesSystemUser = when {
                 filters.systemOnly -> app.isSystemApp
                 filters.userOnly -> !app.isSystemApp
