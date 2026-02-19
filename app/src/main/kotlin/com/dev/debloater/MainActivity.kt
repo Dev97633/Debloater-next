@@ -8,6 +8,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -155,6 +156,24 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val appListState = rememberLazyListState()
     val suggestionListState = rememberLazyListState()
     val smoothFlingBehavior = ScrollableDefaults.flingBehavior()
+    val appIconCache = remember { mutableStateMapOf<String, Drawable?>() }
+
+    suspend fun refreshApps() {
+        if (isRefreshing) return
+        isRefreshing = true
+        try {
+            val refreshedApps = loadAllAppDataWithIcons(pm)
+            allAppData = refreshedApps
+
+            val packageNames = refreshedApps.asSequence().map { it.packageName }.toSet()
+            appIconCache.keys
+                .toList()
+                .filterNot { packageNames.contains(it) }
+                .forEach { appIconCache.remove(it) }
+        } finally {
+            isRefreshing = false
+        }
+    }
 
     fun updateAppData(packageName: String, transform: (AppData) -> AppData) {
         val updatedList = allAppData.map { appData ->
@@ -177,8 +196,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     // Load apps only after onboarding
     LaunchedEffect(currentScreen) {
         if (currentScreen == "apps" && allAppData.isEmpty()) {
-            allAppData = loadAllAppDataWithIcons(pm)
-        }
+            refreshApps()        }
     }
 
     val filteredAppData by remember {
@@ -257,11 +275,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                 modifier = Modifier.padding(padding),
                                 isRefreshing = isRefreshing,
                                 onRefresh = {
-                                    scope.launch {
-                                        isRefreshing = true
-                                        allAppData = loadAllAppDataWithIcons(pm)
-                                        isRefreshing = false
-                                    }
+                                scope.launch { refreshApps() }
                                 }
                             ) {
                                 LazyColumn(
@@ -277,6 +291,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                     ) { appData ->
                                         AppListItem(
                                             appData = appData,
+                                            appIconCache = appIconCache,
                                             onClick = {
                                                 selectedApp = appData
                                                 currentScreen = "details"
@@ -773,21 +788,23 @@ fun DebloaterTopBar(
 @Composable
 fun AppListItem(
     appData: AppData,
+    appIconCache: MutableMap<String, Drawable?>,
     onClick: () -> Unit,
     onToggle: (AppData, Boolean) -> Unit,
     onUninstall: (AppData) -> Unit,
     onRestore: (AppData) -> Unit
 ) {
     val context = LocalContext.current
-    val appIcon by produceState<android.graphics.drawable.Drawable?>(
-        initialValue = null,
-        key1 = appData.packageName
-    ) {
-        value = withContext(Dispatchers.IO) {
+    LaunchedEffect(appData.packageName) {
+        if (appIconCache.containsKey(appData.packageName)) return@LaunchedEffect
+
+        val icon = withContext(Dispatchers.IO) {
             runCatching { context.packageManager.getApplicationIcon(appData.packageName) }
                 .getOrNull()
         }
+        appIconCache[appData.packageName] = icon
     }
+    val appIcon = appIconCache[appData.packageName]
     
     Surface(
         modifier = Modifier
