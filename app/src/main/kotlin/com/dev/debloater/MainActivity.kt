@@ -40,7 +40,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -49,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -101,8 +101,7 @@ data class AppData(
     val isSystem: Boolean,
     val isInstalled: Boolean,
     val isDisabled: Boolean,
-    val safetyLevel: SafetyLevel,
-    val icon: ImageBitmap? = null
+    val safetyLevel: SafetyLevel
 )
 
 data class ConfirmAction(
@@ -779,6 +778,17 @@ fun AppListItem(
     onUninstall: (AppData) -> Unit,
     onRestore: (AppData) -> Unit
 ) {
+    val context = LocalContext.current
+    val appIcon by produceState<android.graphics.drawable.Drawable?>(
+        initialValue = null,
+        key1 = appData.packageName
+    ) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { context.packageManager.getApplicationIcon(appData.packageName) }
+                .getOrNull()
+        }
+    }
+    
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -797,9 +807,9 @@ fun AppListItem(
                 modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (appData.icon != null) {
+                if (appIcon != null) {
                     Image(
-                        bitmap = appData.icon,
+                        painter = rememberAsyncImagePainter(appIcon),
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
                         contentScale = ContentScale.Fit
@@ -998,9 +1008,7 @@ private suspend fun loadAllAppDataWithIcons(
                     } ?: false,
                     isDisabled = appInfo?.enabled == false,
                     isInstalled = isInstalled,
-                    safetyLevel = SafetyClassifier.classify(pkg.packageName),
-                    // Avoid eagerly decoding every app icon into memory to prevent startup OOM crashes.
-                    icon = null
+                    safetyLevel = SafetyClassifier.classify(pkg.packageName)
                 )
             }
             .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.appName })
