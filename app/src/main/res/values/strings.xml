@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Debloater-Next</string>
+    <string name="app_icon_content_description">App icon</string>
 
     <!-- About Screen -->
     <string name="about_title">About</string>
