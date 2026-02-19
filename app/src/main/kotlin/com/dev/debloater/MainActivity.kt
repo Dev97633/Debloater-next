@@ -149,7 +149,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var allAppData by remember { mutableStateOf<List<AppData>>(emptyList()) }
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
-    var filters by rememberSaveable { mutableStateOf(AppFilters()) }
+    var filters by remember { mutableStateOf(AppFilters()) }
     var isRefreshing by remember { mutableStateOf(false) }
     var confirmAction by remember { mutableStateOf<ConfirmAction?>(null) }
     var riskyOverrideAction by remember { mutableStateOf<ConfirmAction?>(null) }
