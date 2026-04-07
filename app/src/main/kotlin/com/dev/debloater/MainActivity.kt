@@ -53,6 +53,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -153,6 +154,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     val allAppData = remember { mutableStateListOf<AppData>() }
     var appDataVersion by remember { mutableIntStateOf(0) }
     var query by rememberSaveable { mutableStateOf("") }
+        var searchQuery by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var filters by remember { mutableStateOf(AppFilters()) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -168,10 +170,18 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         try {
             allAppData.clear()
             appDataVersion++
+            val buffer = mutableListOf<AppData>()
             loadAllAppDataWithIcons(pm) { chunk ->
                 if (chunk.isNotEmpty()) {
-                    allAppData.addAll(chunk)
+                    buffer.addAll(chunk)
+                    if (buffer.size >= 100) {
+                        allAppData.addAll(buffer)
+                        buffer.clear()
+                    }
                 }
+                 if (buffer.isNotEmpty()) {
+                allAppData.addAll(buffer)
+            }
             }
         } finally {
             isRefreshing = false
@@ -202,31 +212,35 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         if (currentScreen == "apps" && allAppData.isEmpty()) {
             refreshApps()        }
     }
-
+     LaunchedEffect(query) {
+        delay(250)
+        searchQuery = query
+    }
     val filteredAppData by produceState(
         initialValue = emptyList(),
-        query,
+        searchQuery,
         filters,
         allAppData.size,
         appDataVersion
     ) {
-        val trimmedQuery = query.trim()
+        value = withContext(Dispatchers.Default) {
+            val trimmedQuery = searchQuery.trim()
+            
+            allAppData.filter { appData ->
+                val matchesQuery = trimmedQuery.isBlank() ||
+                    appData.appName.contains(trimmedQuery, ignoreCase = true) ||
+                    appData.packageName.contains(trimmedQuery, ignoreCase = true)
 
-        value = allAppData.filter { appData ->
-            val matchesQuery = trimmedQuery.isBlank() ||
-                appData.appName.contains(trimmedQuery, ignoreCase = true) ||
-                appData.packageName.contains(trimmedQuery, ignoreCase = true)
+                  val matchesSystemUser = when {
+                    filters.systemOnly -> appData.isSystem
+                    filters.userOnly -> !appData.isSystem
+                    else -> true
+                }
+                val matchesDisabled = !filters.disabledOnly || appData.isDisabled
+                val matchesUninstalled = !filters.uninstalledOnly || !appData.isInstalled
 
-            val matchesSystemUser = when {
-                filters.systemOnly -> appData.isSystem
-                filters.userOnly -> !appData.isSystem
-                else -> true
+               matchesQuery && matchesSystemUser && matchesDisabled && matchesUninstalled
             }
-
-            val matchesDisabled = !filters.disabledOnly || appData.isDisabled
-            val matchesUninstalled = !filters.uninstalledOnly || !appData.isInstalled
-
-            matchesQuery && matchesSystemUser && matchesDisabled && matchesUninstalled
         }
     }
 
@@ -289,7 +303,6 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                 LazyColumn(
                                     state = appListState,
                                     contentPadding = PaddingValues(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
                                     flingBehavior = smoothFlingBehavior,
                                     userScrollEnabled = true
                                 ) {
@@ -298,51 +311,57 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                         key = { it.packageName },
                                         contentType = { "app_item" }
                                     ) { appData ->
-                                         AppListItem(
-                                            appData = appData,
-                                            onClick = {
-                                                selectedApp = appData
-                                                currentScreen = "details"
-                                            },
-                                            onToggle = { appData, isDisabled ->
-                                                if (!isDisabled && appData.safetyLevel == SafetyLevel.RISKY) {
-                                                    riskyOverrideAction = ConfirmAction(
-                                                        action = "disable",
-                                                        packageName = appData.packageName,
-                                                        appName = appData.appName
-                                                    )
-                                                     } else {
-                                                    confirmAction =
-                                                        if (isDisabled) {
-                                                            ConfirmAction(
-                                                                action = "enable",
-                                                                packageName = appData.packageName,
-                                                                appName = appData.appName
-                                                            )
-                                                        } else {
-                                                            ConfirmAction(
-                                                                action = "disable",
-                                                                packageName = appData.packageName,
-                                                                appName = appData.appName
-                                                            )
-                                                        }
-                                                }
+                                         Box(
+                                            modifier = Modifier
+                                                .height(72.dp)
+                                                .padding(bottom = 8.dp)
+                                        ) {
+                                            AppListItem(
+                                                appData = appData,
+                                                onClick = {
+                                                    selectedApp = appData
+                                                    currentScreen = "details"
                                                 },
-                                            onUninstall = { appDataToRemove ->
-                                                confirmAction = ConfirmAction(
-                                                    action = "uninstall",
-                                                    packageName = appDataToRemove.packageName,
-                                                    appName = appDataToRemove.appName
-                                                )
-                                            },
+                                                onToggle = { appData, isDisabled ->
+                                                    if (!isDisabled && appData.safetyLevel == SafetyLevel.RISKY) {
+                                                        riskyOverrideAction = ConfirmAction(
+                                                            action = "disable",
+                                                            packageName = appData.packageName,
+                                                            appName = appData.appName
+                                                        )
+                                                    } else {
+                                                        confirmAction =
+                                                            if (isDisabled) {
+                                                                ConfirmAction(
+                                                                    action = "enable",
+                                                                    packageName = appData.packageName,
+                                                                    appName = appData.appName
+                                                                )
+                                                            } else {
+                                                                ConfirmAction(
+                                                                    action = "disable",
+                                                                    packageName = appData.packageName,
+                                                                    appName = appData.appName
+                                                                )
+                                                            }
+                                                    }
+                                                },
+                                                onUninstall = { appDataToRemove ->
+                                                    confirmAction = ConfirmAction(
+                                                        action = "uninstall",
+                                                        packageName = appDataToRemove.packageName,
+                                                        appName = appDataToRemove.appName
+                                                    )
+                                                },
                                             onRestore = { appDataToRestore ->
-                                                confirmAction = ConfirmAction(
-                                                    action = "restore",
-                                                    packageName = appDataToRestore.packageName,
-                                                    appName = appDataToRestore.appName
-                                                )
-                                            }
-                                        )
+                                                    confirmAction = ConfirmAction(
+                                                        action = "restore",
+                                                        packageName = appDataToRestore.packageName,
+                                                        appName = appDataToRestore.appName
+                                                    )
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -975,6 +994,9 @@ private suspend fun loadAllAppDataWithIcons(
     try {
         val packages = withContext(Dispatchers.Default) {
             pm.getInstalledPackages(PackageManager.MATCH_ALL or PackageManager.MATCH_UNINSTALLED_PACKAGES)
+            .sortedBy { pkg ->
+                    pkg.applicationInfo?.loadLabel(pm)?.toString() ?: pkg.packageName
+                }
         }
         for (chunk in packages.chunked(30)) {
             val mappedChunk = withContext(Dispatchers.Default) {
@@ -1009,7 +1031,6 @@ private suspend fun loadAllAppDataWithIcons(
                         safetyLevel = SafetyClassifier.classify(pkg.packageName)
                     )
                 }
-                    .sortedBy { it.appName }
             }
             onChunkLoaded(mappedChunk)
         }
