@@ -42,7 +42,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -151,7 +150,8 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     var currentScreen by rememberSaveable { mutableStateOf(if (isFirstLaunch) "onboarding" else "apps") }
     var selectedApp by remember { mutableStateOf<AppData?>(null) }
 
-    var allAppData by remember { mutableStateOf<List<AppData>>(emptyList()) }
+    val allAppData = remember { mutableStateListOf<AppData>() }
+    var appDataVersion by remember { mutableIntStateOf(0) }
     var query by rememberSaveable { mutableStateOf("") }
     var active by rememberSaveable { mutableStateOf(false) }
     var filters by remember { mutableStateOf(AppFilters()) }
@@ -166,10 +166,11 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         if (isRefreshing) return
         isRefreshing = true
         try {
-            allAppData = emptyList()
+            allAppData.clear()
+            appDataVersion++
             loadAllAppDataWithIcons(pm) { chunk ->
                 if (chunk.isNotEmpty()) {
-                    allAppData = allAppData + chunk
+                    allAppData.addAll(chunk)
                 }
             }
         } finally {
@@ -178,11 +179,12 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
     }
 
     fun updateAppData(packageName: String, transform: (AppData) -> AppData) {
-        val updatedList = allAppData.map { appData ->
-            if (appData.packageName == packageName) transform(appData) else appData
+        val targetIndex = allAppData.indexOfFirst { it.packageName == packageName }
+        if (targetIndex >= 0) {
+            allAppData[targetIndex] = transform(allAppData[targetIndex])
+            appDataVersion++
         }
-        allAppData = updatedList
-        selectedApp = updatedList.find { it.packageName == packageName }
+        selectedApp = allAppData.find { it.packageName == packageName }
     }
 
     BackHandler {
@@ -201,26 +203,30 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
             refreshApps()        }
     }
 
-    val filteredAppData by remember(query, filters, allAppData) {
-        derivedStateOf {
-            val trimmedQuery = query.trim()
+    val filteredAppData by produceState(
+        initialValue = emptyList(),
+        query,
+        filters,
+        allAppData.size,
+        appDataVersion
+    ) {
+        val trimmedQuery = query.trim()
 
-            allAppData.filter { appData ->
-                val matchesQuery = trimmedQuery.isBlank() ||
-                    appData.appName.contains(trimmedQuery, ignoreCase = true) ||
-                    appData.packageName.contains(trimmedQuery, ignoreCase = true)
+        value = allAppData.filter { appData ->
+            val matchesQuery = trimmedQuery.isBlank() ||
+                appData.appName.contains(trimmedQuery, ignoreCase = true) ||
+                appData.packageName.contains(trimmedQuery, ignoreCase = true)
 
-                val matchesSystemUser = when {
-                    filters.systemOnly -> appData.isSystem
-                    filters.userOnly -> !appData.isSystem
-                    else -> true
-                }
-
-                val matchesDisabled = !filters.disabledOnly || appData.isDisabled
-                val matchesUninstalled = !filters.uninstalledOnly || !appData.isInstalled
-
-                matchesQuery && matchesSystemUser && matchesDisabled && matchesUninstalled
+            val matchesSystemUser = when {
+                filters.systemOnly -> appData.isSystem
+                filters.userOnly -> !appData.isSystem
+                else -> true
             }
+
+            val matchesDisabled = !filters.disabledOnly || appData.isDisabled
+            val matchesUninstalled = !filters.uninstalledOnly || !appData.isInstalled
+
+            matchesQuery && matchesSystemUser && matchesDisabled && matchesUninstalled
         }
     }
 
@@ -795,191 +801,182 @@ fun AppListItem(
     onUninstall: (AppData) -> Unit,
     onRestore: (AppData) -> Unit
 ) {
-    val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .drawBehind {
-                drawLine(
-                    color = dividerColor,
-                    start = androidx.compose.ui.geometry.Offset(68.dp.toPx(), size.height),
-                    end = androidx.compose.ui.geometry.Offset(size.width, size.height),
-                    strokeWidth = 0.5.dp.toPx()
-                )
-            },
+            .clickable(onClick = onClick),
         color = MaterialTheme.colorScheme.surface
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-           
-            Box(
-                modifier = Modifier.size(40.dp),
-                contentAlignment = Alignment.Center
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (appData.iconBitmap != null) {
-                    Image(
-                        bitmap = appData.iconBitmap,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        contentScale = ContentScale.Fit
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            appData.appName.take(1).uppercase(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                Box(
+                    modifier = Modifier.size(40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (appData.iconBitmap != null) {
+                        Image(
+                            bitmap = appData.iconBitmap,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            contentScale = ContentScale.Fit
                         )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                appData.appName.take(1).uppercase(),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
-            }
 
-            
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .widthIn(max = 250.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = appData.appName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .widthIn(max = 250.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = appData.packageName,
-                        style = MaterialTheme.typography.labelSmall,
+                        text = appData.appName,
+                        style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f, fill = false)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    val (labelColor, bgColor) = appData.safetyLevel.badgeColorScheme()
-                   Text(
-                        text = safetyLabel(appData.safetyLevel),
-                        color = labelColor,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier
-                            .background(bgColor, RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                    if (!appData.isInstalled) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text(
-                            text = "•",
+                            text = appData.packageName,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.wrapContentWidth()
-                        )
-                        Text(
-                            text = "Uninstalled",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
                             maxLines = 1,
-                            overflow = TextOverflow.Clip,
-                            modifier = Modifier.wrapContentWidth()
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
-                    }
-                    if (appData.isSystem) {
+                        val (labelColor, bgColor) = appData.safetyLevel.badgeColorScheme()
                         Text(
-                            text = "•",
+                            text = safetyLabel(appData.safetyLevel),
+                            color = labelColor,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.wrapContentWidth()
+                            modifier = Modifier
+                                .background(bgColor, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
                         )
-                        Text(
-                            text = "System",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip,
-                            modifier = Modifier.wrapContentWidth()
-                        )
+                        if (!appData.isInstalled) {
+                            Text(
+                                text = "•",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.wrapContentWidth()
+                            )
+                            Text(
+                                text = "Uninstalled",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                                modifier = Modifier.wrapContentWidth()
+                            )
+                        }
+                        if (appData.isSystem) {
+                            Text(
+                                text = "•",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.wrapContentWidth()
+                            )
+                            Text(
+                                text = "System",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                                modifier = Modifier.wrapContentWidth()
+                            )
+                        }
                     }
                 }
-            }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.wrapContentWidth()
-            ) {
-                if (appData.isInstalled) {
-                    IconButton(
-                        onClick = {
-                            onToggle(appData, appData.isDisabled)
-                        },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            if (appData.isDisabled) Icons.Default.CheckCircle else Icons.Default.Block,
-                            contentDescription = if (appData.isDisabled) "Enable" else "Disable",
-                            modifier = Modifier.size(18.dp),
-                            tint = if (appData.isDisabled)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.error
-                        )
-                    }
-                    IconButton(
-                        onClick = { onUninstall(appData) },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Uninstall",
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                } else {
-                    IconButton(
-                        onClick = { onRestore(appData) },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Restore,
-                            contentDescription = "Restore",
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.wrapContentWidth()
+                ) {
+                    if (appData.isInstalled) {
+                        IconButton(
+                            onClick = {
+                                onToggle(appData, appData.isDisabled)
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                if (appData.isDisabled) Icons.Default.CheckCircle else Icons.Default.Block,
+                                contentDescription = if (appData.isDisabled) "Enable" else "Disable",
+                                modifier = Modifier.size(18.dp),
+                                tint = if (appData.isDisabled)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.error
+                            )
+                        }
+                        IconButton(
+                            onClick = { onUninstall(appData) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Uninstall",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    } else {
+                        IconButton(
+                            onClick = { onRestore(appData) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Restore,
+                                contentDescription = "Restore",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 68.dp),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+            )
         }
     }
 }
+
 private suspend fun loadAllAppDataWithIcons(
-pm: PackageManager,
+    pm: PackageManager,
     onChunkLoaded: suspend (List<AppData>) -> Unit
 ) {
     try {
         val packages = withContext(Dispatchers.Default) {
             pm.getInstalledPackages(PackageManager.MATCH_ALL or PackageManager.MATCH_UNINSTALLED_PACKAGES)
         }
-        val sortedPackages = packages.sortedBy { pkg ->
-            pkg.applicationInfo?.let { info ->
-                runCatching { info.loadLabel(pm).toString() }.getOrNull()
-            } ?: pkg.packageName
-        }
-
-        for (chunk in sortedPackages.chunked(30)) {
+        for (chunk in packages.chunked(30)) {
             val mappedChunk = withContext(Dispatchers.Default) {
                 chunk.map { pkg ->
                     val appInfo = pkg.applicationInfo ?: runCatching {
@@ -997,7 +994,7 @@ pm: PackageManager,
                     } ?: pkg.packageName
                     val iconBitmap = runCatching {
                         val drawable = appInfo?.loadIcon(pm) ?: pm.getApplicationIcon(pkg.packageName)
-                        drawable.toBitmap(width = 80, height = 80).asImageBitmap()
+                        drawable.toBitmap(width = 48, height = 48).asImageBitmap()
                     }.getOrNull()
                     AppData(
                         packageName = pkg.packageName,
@@ -1012,9 +1009,11 @@ pm: PackageManager,
                         safetyLevel = SafetyClassifier.classify(pkg.packageName)
                     )
                 }
+                    .sortedBy { it.appName }
             }
-           onChunkLoaded(mappedChunk)
+            onChunkLoaded(mappedChunk)
         }
     } catch (e: Exception) {
-        onChunkLoaded(emptyList())    }
+        onChunkLoaded(emptyList())
+    }
 }
