@@ -2,6 +2,7 @@ package com.dev.debloater.apps
 
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -120,9 +121,23 @@ class AppListFragment : Fragment(R.layout.fragment_app_list) {
                     isDisabled = isDisabled,
                     isInstalled = isInstalled,
                     stateText = stateText,
-                    icon = pm.getApplicationIcon(appInfo),
+                    icon = loadAppIconWithFallback(pm = pm, appInfo = appInfo),
                 )
             }
             .sortedBy { it.appLabel.lowercase() }
+    }
+    private fun loadAppIconWithFallback(
+        pm: PackageManager,
+        appInfo: ApplicationInfo,
+    ): Drawable {
+        return try {
+            pm.getApplicationIcon(appInfo)
+        } catch (_: Exception) {
+            try {
+                appInfo.loadIcon(pm)
+            } catch (_: Exception) {
+                pm.defaultActivityIcon
+            }
+        }
     }
 }
