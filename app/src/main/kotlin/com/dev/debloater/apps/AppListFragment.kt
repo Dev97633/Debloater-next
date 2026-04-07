@@ -16,7 +16,10 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.dev.debloater.R
 import com.google.android.material.chip.Chip
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Example XML + RecyclerView based screen that combines search text and filter toggles.
@@ -25,6 +28,7 @@ class AppListFragment : Fragment(R.layout.fragment_app_list) {
 
     private val viewModel: AppListViewModel by viewModels()
     private val appAdapter = AppListAdapter()
+    private var loadAppsJob: Job? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -45,7 +49,11 @@ class AppListFragment : Fragment(R.layout.fragment_app_list) {
         }
 
         // Load source apps once; ViewModel will handle all filtering combinations.
-        viewModel.setAllApps(loadInstalledApps())
+        loadAppsJob?.cancel()
+        loadAppsJob = viewLifecycleOwner.lifecycleScope.launch {
+            val apps = loadInstalledAppsSafely()
+            viewModel.setAllApps(apps)
+        }
 
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
@@ -87,8 +95,15 @@ class AppListFragment : Fragment(R.layout.fragment_app_list) {
         }
     }
 
-    private fun loadInstalledApps(): List<AppItem> {
-        val pm = requireContext().packageManager
+    override fun onDestroyView() {
+        loadAppsJob?.cancel()
+        loadAppsJob = null
+        super.onDestroyView()
+    }
+
+    private suspend fun loadInstalledAppsSafely(): List<AppItem> = withContext(Dispatchers.IO) {
+        val context = context ?: return@withContext emptyList()
+        val pm = context.packageManager
 
         val flags = PackageManager.GET_META_DATA or PackageManager.MATCH_UNINSTALLED_PACKAGES
         val appInfos: List<ApplicationInfo> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -98,31 +113,35 @@ class AppListFragment : Fragment(R.layout.fragment_app_list) {
             pm.getInstalledApplications(flags)
         }
 
-        return appInfos
-            .map { appInfo ->
-                val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                val isInstalled = (appInfo.flags and ApplicationInfo.FLAG_INSTALLED) != 0
-                val isDisabled = !appInfo.enabled
-                val stateText = buildString {
-                    append(if (isSystem) "System" else "User")
-                    if (isDisabled) append(" • Disabled")
-                    if (!isInstalled) append(" • Uninstalled")
-                }
+        return@withContext appInfos
+            .mapNotNull { appInfo ->
+                runCatching {
+                    val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                    val isInstalled = (appInfo.flags and ApplicationInfo.FLAG_INSTALLED) != 0
+                    val isDisabled = !appInfo.enabled
+                    val stateText = buildString {
+                        append(if (isSystem) "System" else "User")
+                        if (isDisabled) append(" • Disabled")
+                        if (!isInstalled) append(" • Uninstalled")
+                    }
 
-                val appLabel = pm.getApplicationLabel(appInfo).toString()
-                val packageName = appInfo.packageName
+                    val packageName = appInfo.packageName.orEmpty()
+                    val appLabel = runCatching {
+                        pm.getApplicationLabel(appInfo).toString()
+                    }.getOrDefault(packageName)
 
-                AppItem(
-                    appLabel = appLabel,
-                    packageName = packageName,
-                    appLabelKey = appLabel.lowercase(),
-                    packageNameKey = packageName.lowercase(),
-                    isSystemApp = isSystem,
-                    isDisabled = isDisabled,
-                    isInstalled = isInstalled,
-                    stateText = stateText,
-                    icon = loadAppIconWithFallback(pm = pm, appInfo = appInfo),
-                )
+                    AppItem(
+                        appLabel = appLabel,
+                        packageName = packageName,
+                        appLabelKey = appLabel.lowercase(),
+                        packageNameKey = packageName.lowercase(),
+                        isSystemApp = isSystem,
+                        isDisabled = isDisabled,
+                        isInstalled = isInstalled,
+                        stateText = stateText,
+                        icon = loadAppIconWithFallback(pm = pm, appInfo = appInfo),
+                    )
+                }.getOrNull()
             }
             .sortedBy { it.appLabel.lowercase() }
     }
