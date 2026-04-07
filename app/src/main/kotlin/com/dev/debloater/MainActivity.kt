@@ -8,7 +8,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
-import android.graphics.drawable.Drawable
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -33,14 +32,17 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -50,7 +52,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.runtime.key
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -102,7 +103,7 @@ fun DebloaterTheme(
 data class AppData(
     val packageName: String,
     val appName: String,
-    val icon: Drawable?,
+    val iconBitmap: ImageBitmap?,
     val isSystem: Boolean,
     val isInstalled: Boolean,
     val isDisabled: Boolean,
@@ -165,8 +166,12 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
         if (isRefreshing) return
         isRefreshing = true
         try {
-            val refreshedApps = loadAllAppDataWithIcons(pm)
-            allAppData = refreshedApps
+            allAppData = emptyList()
+            loadAllAppDataWithIcons(pm) { chunk ->
+                if (chunk.isNotEmpty()) {
+                    allAppData = allAppData + chunk
+                }
+            }
         } finally {
             isRefreshing = false
         }
@@ -287,53 +292,51 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                         key = { it.packageName },
                                         contentType = { "app_item" }
                                     ) { appData ->
-                                         key(appData.packageName) {
-                                            AppListItem(
-                                                appData = appData,
-                                                onClick = {
-                                                    selectedApp = appData
-                                                    currentScreen = "details"
-                                                },
-                                                onToggle = { appData, isDisabled ->
-                                                    if (!isDisabled && appData.safetyLevel == SafetyLevel.RISKY) {
-                                                        riskyOverrideAction = ConfirmAction(
-                                                            action = "disable",
-                                                            packageName = appData.packageName,
-                                                            appName = appData.appName
-                                                        )
-                                                    } else {
-                                                        confirmAction =
-                                                            if (isDisabled) {
-                                                                ConfirmAction(
-                                                                    action = "enable",
-                                                                    packageName = appData.packageName,
-                                                                    appName = appData.appName
-                                                                )
-                                                            } else {
-                                                                ConfirmAction(
-                                                                    action = "disable",
-                                                                    packageName = appData.packageName,
-                                                                    appName = appData.appName
-                                                                )
-                                                            }
-                                                    }
-                                                },
-                                                onUninstall = { appDataToRemove ->
-                                                    confirmAction = ConfirmAction(
-                                                        action = "uninstall",
-                                                        packageName = appDataToRemove.packageName,
-                                                        appName = appDataToRemove.appName
+                                         AppListItem(
+                                            appData = appData,
+                                            onClick = {
+                                                selectedApp = appData
+                                                currentScreen = "details"
+                                            },
+                                            onToggle = { appData, isDisabled ->
+                                                if (!isDisabled && appData.safetyLevel == SafetyLevel.RISKY) {
+                                                    riskyOverrideAction = ConfirmAction(
+                                                        action = "disable",
+                                                        packageName = appData.packageName,
+                                                        appName = appData.appName
                                                     )
-                                                },
-                                                onRestore = { appDataToRestore ->
-                                                    confirmAction = ConfirmAction(
-                                                        action = "restore",
-                                                        packageName = appDataToRestore.packageName,
-                                                        appName = appDataToRestore.appName
-                                                    )
+                                                     } else {
+                                                    confirmAction =
+                                                        if (isDisabled) {
+                                                            ConfirmAction(
+                                                                action = "enable",
+                                                                packageName = appData.packageName,
+                                                                appName = appData.appName
+                                                            )
+                                                        } else {
+                                                            ConfirmAction(
+                                                                action = "disable",
+                                                                packageName = appData.packageName,
+                                                                appName = appData.appName
+                                                            )
+                                                        }
                                                 }
-                                            )
-                                        }
+                                                },
+                                            onUninstall = { appDataToRemove ->
+                                                confirmAction = ConfirmAction(
+                                                    action = "uninstall",
+                                                    packageName = appDataToRemove.packageName,
+                                                    appName = appDataToRemove.appName
+                                                )
+                                            },
+                                            onRestore = { appDataToRestore ->
+                                                confirmAction = ConfirmAction(
+                                                    action = "restore",
+                                                    packageName = appDataToRestore.packageName,
+                                                    appName = appDataToRestore.appName
+                                                )
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -465,7 +468,7 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
 
                                         "restore" -> {
                                             ShizukuManager.restore(pkg)
-                                            allAppData = loadAllAppDataWithIcons(pm)
+                                            refreshApps()
                                             selectedApp = allAppData.find { it.packageName == pkg }
                                         }
                                     }
@@ -792,13 +795,18 @@ fun AppListItem(
     onUninstall: (AppData) -> Unit,
     onRestore: (AppData) -> Unit
 ) {
-       val appIconBitmap = remember(appData.icon) {
-        appData.icon?.toBitmap(width = 80, height = 80)?.asImageBitmap()
-    }    
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .drawBehind {
+                drawLine(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                    start = androidx.compose.ui.geometry.Offset(68.dp.toPx(), size.height),
+                    end = androidx.compose.ui.geometry.Offset(size.width, size.height),
+                    strokeWidth = 0.5.dp.toPx()
+                )
+            },
         color = MaterialTheme.colorScheme.surface
     ) {
         Row(
@@ -813,9 +821,9 @@ fun AppListItem(
                 modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (appIconBitmap != null) {
+                if (appData.iconBitmap != null) {
                     Image(
-                        bitmap = appIconBitmap,
+                        bitmap = appData.iconBitmap,
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
                         contentScale = ContentScale.Fit
@@ -864,34 +872,13 @@ fun AppListItem(
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     val (labelColor, bgColor) = appData.safetyLevel.badgeColorScheme()
-                    AssistChip(
-                        onClick = {},
-                        enabled = false,
-                        label = {
-                            Text(
-                                text = safetyLabel(appData.safetyLevel),
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = when (appData.safetyLevel) {
-                                    SafetyLevel.SAFE -> Icons.Default.Verified
-                                    SafetyLevel.CAUTION -> Icons.Default.WarningAmber
-                                    SafetyLevel.RISKY -> Icons.Default.Dangerous
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = bgColor,
-                            labelColor = labelColor,
-                            leadingIconContentColor = labelColor,
-                            disabledContainerColor = bgColor,
-                            disabledLabelColor = labelColor,
-                            disabledLeadingIconContentColor = labelColor
-                        )
+                   Text(
+                        text = safetyLabel(appData.safetyLevel),
+                        color = labelColor,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier
+                            .background(bgColor, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                     if (!appData.isInstalled) {
                         Text(
@@ -975,54 +962,58 @@ fun AppListItem(
                 }
             }
         }
-
-        Divider(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 68.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-            thickness = 0.5.dp
-        )
     }
 }
 private suspend fun loadAllAppDataWithIcons(
-    pm: PackageManager
-): List<AppData> = withContext(Dispatchers.Default) {
-
+pm: PackageManager,
+    onChunkLoaded: suspend (List<AppData>) -> Unit
+) {
     try {
-        pm.getInstalledPackages(PackageManager.MATCH_ALL or PackageManager.MATCH_UNINSTALLED_PACKAGES)
-            .asSequence()
-            .map { pkg ->
-                val appInfo = pkg.applicationInfo ?: runCatching {
-                    pm.getApplicationInfo(
-                        pkg.packageName,
-                        PackageManager.MATCH_UNINSTALLED_PACKAGES or PackageManager.MATCH_DISABLED_COMPONENTS
-                    )
-                }.getOrNull()
-                val isInstalled = appInfo?.flags
-                    ?.and(ApplicationInfo.FLAG_INSTALLED)
-                    ?.let { it != 0 }
-                    ?: false
-                AppData(
-                    packageName = pkg.packageName,
-                    appName = appInfo?.let {
-                        runCatching { it.loadLabel(pm).toString() }.getOrNull()
-                    } ?: pkg.packageName,
-                    icon = runCatching { appInfo?.loadIcon(pm) ?: pm.getApplicationIcon(pkg.packageName) }
-                        .getOrNull(),
-                    isSystem = appInfo?.let {
-                        it.flags and ApplicationInfo.FLAG_SYSTEM != 0 ||
-                            it.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
-                    } ?: false,
-                    isDisabled = appInfo?.enabled == false,
-                    isInstalled = isInstalled,
-                    safetyLevel = SafetyClassifier.classify(pkg.packageName)
-                )
-            }
-            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.appName })
-            .toList()
+        val packages = withContext(Dispatchers.Default) {
+            pm.getInstalledPackages(PackageManager.MATCH_ALL or PackageManager.MATCH_UNINSTALLED_PACKAGES)
+        }
+        val sortedPackages = packages.sortedBy { pkg ->
+            pkg.applicationInfo?.let { info ->
+                runCatching { info.loadLabel(pm).toString() }.getOrNull()
+            } ?: pkg.packageName
+        }
 
+        for (chunk in sortedPackages.chunked(30)) {
+            val mappedChunk = withContext(Dispatchers.Default) {
+                chunk.map { pkg ->
+                    val appInfo = pkg.applicationInfo ?: runCatching {
+                        pm.getApplicationInfo(
+                            pkg.packageName,
+                            PackageManager.MATCH_UNINSTALLED_PACKAGES or PackageManager.MATCH_DISABLED_COMPONENTS
+                        )
+                    }.getOrNull()
+                    val isInstalled = appInfo?.flags
+                        ?.and(ApplicationInfo.FLAG_INSTALLED)
+                        ?.let { it != 0 }
+                        ?: false
+                    val appName = appInfo?.let {
+                        runCatching { it.loadLabel(pm).toString() }.getOrNull()
+                    } ?: pkg.packageName
+                    val iconBitmap = runCatching {
+                        val drawable = appInfo?.loadIcon(pm) ?: pm.getApplicationIcon(pkg.packageName)
+                        drawable.toBitmap(width = 80, height = 80).asImageBitmap()
+                    }.getOrNull()
+                    AppData(
+                        packageName = pkg.packageName,
+                        appName = appName,
+                        iconBitmap = iconBitmap,
+                        isSystem = appInfo?.let {
+                            it.flags and ApplicationInfo.FLAG_SYSTEM != 0 ||
+                                it.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
+                        } ?: false,
+                        isDisabled = appInfo?.enabled == false,
+                        isInstalled = isInstalled,
+                        safetyLevel = SafetyClassifier.classify(pkg.packageName)
+                    )
+                }
+            }
+           onChunkLoaded(mappedChunk)
+        }
     } catch (e: Exception) {
-        emptyList()
-    }
+        onChunkLoaded(emptyList())    }
 }
