@@ -795,13 +795,14 @@ fun AppListItem(
     onUninstall: (AppData) -> Unit,
     onRestore: (AppData) -> Unit
 ) {
+    val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .drawBehind {
                 drawLine(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                    color = dividerColor,
                     start = androidx.compose.ui.geometry.Offset(68.dp.toPx(), size.height),
                     end = androidx.compose.ui.geometry.Offset(size.width, size.height),
                     strokeWidth = 0.5.dp.toPx()
