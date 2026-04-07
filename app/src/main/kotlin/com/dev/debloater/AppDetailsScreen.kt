@@ -6,12 +6,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -19,7 +19,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.core.graphics.drawable.toBitmap
 
 private fun SafetyLevel.badgeColorScheme(): Pair<Color, Color> =
     when (this) {
@@ -43,9 +42,6 @@ fun AppDetailsScreen(
     onUninstall: () -> Unit,
     onRestore: () -> Unit
 ) {
-val iconBitmap = remember(appData.icon) {
-        appData.icon?.toBitmap(width = 240, height = 240)?.asImageBitmap()
-    }
 
     var isDisabling by remember { mutableStateOf(false) }
     var isUninstalling by remember { mutableStateOf(false) }
@@ -77,9 +73,9 @@ val iconBitmap = remember(appData.icon) {
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (iconBitmap != null) {
+                if (appData.iconBitmap != null) {
                     Image(
-                        bitmap = iconBitmap,
+                        bitmap = appData.iconBitmap,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
@@ -136,29 +132,13 @@ val iconBitmap = remember(appData.icon) {
                     Text("Safety", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
                     val (labelColor, bgColor) = appData.safetyLevel.badgeColorScheme()
-                    AssistChip(
-                        onClick = {},
-                        enabled = false,
-                        label = { Text(safetyLabel(appData.safetyLevel)) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = when (appData.safetyLevel) {
-                                    SafetyLevel.SAFE -> Icons.Default.Verified
-                                    SafetyLevel.CAUTION -> Icons.Default.WarningAmber
-                                    SafetyLevel.RISKY -> Icons.Default.Dangerous
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = bgColor,
-                            labelColor = labelColor,
-                            leadingIconContentColor = labelColor,
-                            disabledContainerColor = bgColor,
-                            disabledLabelColor = labelColor,
-                            disabledLeadingIconContentColor = labelColor
-                        )
+                     Text(
+                        text = safetyLabel(appData.safetyLevel),
+                        color = labelColor,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier
+                            .background(bgColor, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }
