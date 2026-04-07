@@ -11,16 +11,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import coil.compose.rememberAsyncImagePainter
-
+import androidx.core.graphics.drawable.toBitmap
 
 private fun SafetyLevel.badgeColorScheme(): Pair<Color, Color> =
     when (this) {
@@ -44,18 +43,8 @@ fun AppDetailsScreen(
     onUninstall: () -> Unit,
     onRestore: () -> Unit
 ) {
-    val context = LocalContext.current
-    val pm = context.packageManager
-
-    val icon by remember(appData.packageName) {
-        derivedStateOf {
-            try {
-                val appInfo = pm.getApplicationInfo(appData.packageName, 0)
-                appInfo.loadIcon(pm)
-            } catch (e: Exception) {
-                null
-            }
-        }
+val iconBitmap = remember(appData.icon) {
+        appData.icon?.toBitmap(width = 240, height = 240)?.asImageBitmap()
     }
 
     var isDisabling by remember { mutableStateOf(false) }
@@ -88,9 +77,9 @@ fun AppDetailsScreen(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (icon != null) {
+                if (iconBitmap != null) {
                     Image(
-                        painter = rememberAsyncImagePainter(icon),
+                        bitmap = iconBitmap,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
