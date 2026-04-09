@@ -9,14 +9,20 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import java.util.Locale
 
 /**
  * MVVM holder for the app list filtering state.
  * Filtering logic lives here instead of Fragment/Activity.
  */
 class AppListViewModel : ViewModel() {
+    companion object {
+        private const val SEARCH_DEBOUNCE_MS = 180L
+    }
 
     private val allApps = MutableStateFlow<List<AppItem>>(emptyList())
     private val searchQuery = MutableStateFlow("")
@@ -27,8 +33,8 @@ class AppListViewModel : ViewModel() {
 
     val filteredApps: StateFlow<List<AppItem>> = combine(
         allApps,
-        searchQuery,
-        filters,
+        searchQuery.debounce(SEARCH_DEBOUNCE_MS).distinctUntilChanged(),
+        filters.distinctUntilChanged(),
     ) { apps, query, filters ->
         filterAppsInternal(apps = apps, query = query, filters = filters)
     }.stateIn(
@@ -86,8 +92,10 @@ class AppListViewModel : ViewModel() {
         query: String,
         filters: FilterState,
     ): List<AppItem> {
-        val normalizedQuery = query.trim().lowercase()
-        return apps.filter { app ->
+        val normalizedQuery = query.trim().lowercase(Locale.ROOT)
+        if (apps.isEmpty()) return emptyList()
+
+        return apps.asSequence().filter { app ->
             val matchesQuery = normalizedQuery.isBlank() ||
                 app.appLabelKey.contains(normalizedQuery) ||
                 app.packageNameKey.contains(normalizedQuery)
@@ -102,6 +110,6 @@ class AppListViewModel : ViewModel() {
             val matchesUninstalled = !filters.uninstalledOnly || !app.isInstalled
 
             matchesQuery && matchesSystemUser && matchesDisabled && matchesUninstalled
-        }
+        }.toList()
     }
 }
