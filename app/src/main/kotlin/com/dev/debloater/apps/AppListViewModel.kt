@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import java.util.Locale
@@ -34,7 +33,7 @@ class AppListViewModel : ViewModel() {
     val filteredApps: StateFlow<List<AppItem>> = combine(
         allApps,
         searchQuery.debounce(SEARCH_DEBOUNCE_MS).distinctUntilChanged(),
-        filters.distinctUntilChanged(),
+        filters,
     ) { apps, query, filters ->
         filterAppsInternal(apps = apps, query = query, filters = filters)
     }.stateIn(
