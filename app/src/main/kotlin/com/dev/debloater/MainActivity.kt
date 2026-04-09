@@ -8,7 +8,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
-import android.graphics.drawable.Drawable
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -41,6 +40,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -50,7 +50,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.runtime.key
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -98,11 +97,10 @@ fun DebloaterTheme(
     MaterialTheme(colorScheme = scheme, content = content)
 }
 
-@Immutable
 data class AppData(
     val packageName: String,
     val appName: String,
-    val icon: Drawable?,
+    val icon: ImageBitmap?,
     val isSystem: Boolean,
     val isInstalled: Boolean,
     val isDisabled: Boolean,
@@ -287,53 +285,51 @@ fun DebloaterScreen(snackbarHostState: SnackbarHostState) {
                                         key = { it.packageName },
                                         contentType = { "app_item" }
                                     ) { appData ->
-                                         key(appData.packageName) {
-                                            AppListItem(
-                                                appData = appData,
-                                                onClick = {
-                                                    selectedApp = appData
-                                                    currentScreen = "details"
-                                                },
-                                                onToggle = { appData, isDisabled ->
-                                                    if (!isDisabled && appData.safetyLevel == SafetyLevel.RISKY) {
-                                                        riskyOverrideAction = ConfirmAction(
-                                                            action = "disable",
-                                                            packageName = appData.packageName,
-                                                            appName = appData.appName
-                                                        )
-                                                    } else {
-                                                        confirmAction =
-                                                            if (isDisabled) {
-                                                                ConfirmAction(
-                                                                    action = "enable",
-                                                                    packageName = appData.packageName,
-                                                                    appName = appData.appName
-                                                                )
-                                                            } else {
-                                                                ConfirmAction(
-                                                                    action = "disable",
-                                                                    packageName = appData.packageName,
-                                                                    appName = appData.appName
-                                                                )
-                                                            }
-                                                    }
-                                                },
-                                                onUninstall = { appDataToRemove ->
-                                                    confirmAction = ConfirmAction(
-                                                        action = "uninstall",
-                                                        packageName = appDataToRemove.packageName,
-                                                        appName = appDataToRemove.appName
+                                        AppListItem(
+                                            appData = appData,
+                                            onClick = {
+                                                selectedApp = appData
+                                                currentScreen = "details"
+                                            },
+                                            onToggle = { appData, isDisabled ->
+                                                if (!isDisabled && appData.safetyLevel == SafetyLevel.RISKY) {
+                                                    riskyOverrideAction = ConfirmAction(
+                                                        action = "disable",
+                                                        packageName = appData.packageName,
+                                                        appName = appData.appName
                                                     )
-                                                },
-                                                onRestore = { appDataToRestore ->
-                                                    confirmAction = ConfirmAction(
-                                                        action = "restore",
-                                                        packageName = appDataToRestore.packageName,
-                                                        appName = appDataToRestore.appName
-                                                    )
+                                                } else {
+                                                    confirmAction =
+                                                        if (isDisabled) {
+                                                            ConfirmAction(
+                                                                action = "enable",
+                                                                packageName = appData.packageName,
+                                                                appName = appData.appName
+                                                            )
+                                                        } else {
+                                                            ConfirmAction(
+                                                                action = "disable",
+                                                                packageName = appData.packageName,
+                                                                appName = appData.appName
+                                                            )
+                                                        }
                                                 }
-                                            )
-                                        }
+                                            },
+                                            onUninstall = { appDataToRemove ->
+                                                confirmAction = ConfirmAction(
+                                                    action = "uninstall",
+                                                    packageName = appDataToRemove.packageName,
+                                                    appName = appDataToRemove.appName
+                                                )
+                                            },
+                                            onRestore = { appDataToRestore ->
+                                                confirmAction = ConfirmAction(
+                                                    action = "restore",
+                                                    packageName = appDataToRestore.packageName,
+                                                    appName = appDataToRestore.appName
+                                                )
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -792,9 +788,6 @@ fun AppListItem(
     onUninstall: (AppData) -> Unit,
     onRestore: (AppData) -> Unit
 ) {
-       val appIconBitmap = remember(appData.icon) {
-        appData.icon?.toBitmap(width = 80, height = 80)?.asImageBitmap()
-    }    
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -813,9 +806,9 @@ fun AppListItem(
                 modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (appIconBitmap != null) {
+                if (appData.icon != null) {
                     Image(
-                        bitmap = appIconBitmap,
+                        bitmap = appData.icon,
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
                         contentScale = ContentScale.Fit
@@ -1008,8 +1001,11 @@ private suspend fun loadAllAppDataWithIcons(
                     appName = appInfo?.let {
                         runCatching { it.loadLabel(pm).toString() }.getOrNull()
                     } ?: pkg.packageName,
-                    icon = runCatching { appInfo?.loadIcon(pm) ?: pm.getApplicationIcon(pkg.packageName) }
-                        .getOrNull(),
+                    icon = runCatching {
+                        (appInfo?.loadIcon(pm) ?: pm.getApplicationIcon(pkg.packageName))
+                            .toBitmap(width = 80, height = 80)
+                            .asImageBitmap()
+                    }.getOrNull(),
                     isSystem = appInfo?.let {
                         it.flags and ApplicationInfo.FLAG_SYSTEM != 0 ||
                             it.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
