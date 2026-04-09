@@ -19,6 +19,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 
 private fun SafetyLevel.badgeColorScheme(): Pair<Color, Color> =
     when (this) {
@@ -46,7 +48,10 @@ fun AppDetailsScreen(
     var isDisabling by remember { mutableStateOf(false) }
     var isUninstalling by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
-
+    val appIconBitmap = remember(appData.icon) {
+        appData.icon?.toBitmap(width = 240, height = 240)?.asImageBitmap()
+    }
+    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -73,9 +78,9 @@ fun AppDetailsScreen(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (appData.iconBitmap != null) {
+                if (appIconBitmap != null) {
                     Image(
-                        bitmap = appData.iconBitmap,
+                        bitmap = appIconBitmap,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
