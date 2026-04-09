@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 /**
  * Example XML + RecyclerView based screen that combines search text and filter toggles.
@@ -129,12 +130,14 @@ class AppListFragment : Fragment(R.layout.fragment_app_list) {
                     val appLabel = runCatching {
                         pm.getApplicationLabel(appInfo).toString()
                     }.getOrDefault(packageName)
+                    val appLabelKey = appLabel.lowercase(Locale.ROOT)
+                    val packageNameKey = packageName.lowercase(Locale.ROOT)
 
                     AppItem(
                         appLabel = appLabel,
                         packageName = packageName,
-                        appLabelKey = appLabel.lowercase(),
-                        packageNameKey = packageName.lowercase(),
+                        appLabelKey = appLabelKey,
+                        packageNameKey = packageNameKey,
                         isSystemApp = isSystem,
                         isDisabled = isDisabled,
                         isInstalled = isInstalled,
@@ -143,7 +146,7 @@ class AppListFragment : Fragment(R.layout.fragment_app_list) {
                     )
                 }.getOrNull()
             }
-            .sortedBy { it.appLabel.lowercase() }
+            .sortedBy { it.appLabelKey }
     }
     private fun loadAppIconWithFallback(
         pm: PackageManager,
