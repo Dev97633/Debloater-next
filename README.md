@@ -39,12 +39,9 @@
 - **Disabling/uninstalling critical system apps may cause:**
   - Bootloops
   - Soft-bricks
-  - Loss of important features (camera, calls, Wi-Fi, etc.)
   - Need for factory reset or re-flashing firmware
 
 - **You are solely responsible** for any damage or issues caused by using this app.
-- **Always research before disabling/uninstalling any app** — especially ones with system-level permissions.
-- **Use at your own risk** — the developer is not liable for any data loss or device damage.
   
 
 ## Requirements
